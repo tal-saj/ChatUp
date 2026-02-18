@@ -57,7 +57,7 @@ export default function SetAvatar() {
     };
 
     generateAvatars();
-  }, []);
+  }, [toastOptions]);
 
   const setProfilePicture = async () => {
     if (selectedAvatar === undefined) {

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import styled from "styled-components";
 import ChatInput from "./ChatInput";
 import Logout from "./Logout";
-import { v4 as uuidv4 } from "uuid";
 import axios from "axios";
 import { sendMessageRoute, recieveMessageRoute } from "../utils/APIRoutes";
 
@@ -38,20 +37,23 @@ export default function ChatContainer({ currentChat, socket }) {
   }, [currentChat, currentUser]);
 
   // Handle incoming messages via socket
-  useEffect(() => {
-    if (!socket.current) return;
+useEffect(() => {
+  if (!socket.current) return;
 
-    const handleMsgReceive = (msg) => {
-      setArrivalMessage({ fromSelf: false, message: msg });
-    };
+  // ← Copy ref value here
+  const currentSocket = socket.current;
 
-    socket.current.on("msg-recieve", handleMsgReceive);
+  const handleMsgReceive = (msg) => {
+    setArrivalMessage({ fromSelf: false, message: msg });
+  };
 
-    // Cleanup listener when component unmounts or socket changes
-    return () => {
-      socket.current.off("msg-recieve", handleMsgReceive);
-    };
-  }, [socket]);
+  currentSocket.on("msg-recieve", handleMsgReceive);
+
+  return () => {
+    // Use the copied value in cleanup
+    currentSocket.off("msg-recieve", handleMsgReceive);
+  };
+}, [socket]);
 
   // Add arrived message to state
   useEffect(() => {
