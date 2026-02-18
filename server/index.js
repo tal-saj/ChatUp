@@ -1,52 +1,39 @@
+// index.js  (for Vercel deployment – HTTP API only)
+
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const authRoutes = require("./routes/auth");
 const messageRoutes = require("./routes/messages");
-const app = express();
-const socket = require("socket.io");
+
 require("dotenv").config();
 
-app.use(cors());
+const app = express();
+
+app.use(cors({
+  origin: ["https://chat-up-frontend-three.vercel.app", "http://localhost:3000"],
+  credentials: true,
+}));
+
 app.use(express.json());
 
+// MongoDB connection (runs once per cold start – fine for serverless)
 mongoose
   .connect(process.env.MONGO_URL, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
   .then(() => {
-    console.log("DB Connetion Successfull");
+    console.log("DB Connection Successful");
   })
   .catch((err) => {
-    console.log(err.message);
+    console.error("DB Connection Error:", err.message);
   });
 
+// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 
-const server = app.listen(process.env.PORT, () =>
-  console.log(`Server started on ${process.env.PORT}`)
-);
-const io = socket(server, {
-  cors: {
-    origin: ["https://chat-up-backend-nu.vercel.app","http://localhost:3000"],
-    credentials: true,
-  },
-});
-
-global.onlineUsers = new Map();
-
-io.on("connection", (socket) => {
-  global.chatSocket = socket;
-  socket.on("add-user", (userId) => {
-    onlineUsers.set(userId, socket.id);
-  });
-
-  socket.on("send-msg", (data) => {
-    const sendUserSocket = onlineUsers.get(data.to);
-    if (sendUserSocket) {
-      socket.to(sendUserSocket).emit("msg-recieve", data.msg);
-    }
-  });
-});
+// VERY IMPORTANT: Do NOT call app.listen() on Vercel
+// Export the app so Vercel can invoke it as a serverless function
+module.exports = app;
