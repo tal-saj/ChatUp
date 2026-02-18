@@ -9,7 +9,13 @@ const messageRoutes = require("./routes/messages");
 require("dotenv").config();
 
 const app = express();
-
+app.get("/debug", (req, res) => {
+  res.json({
+    message: "Backend is alive",
+    time: new Date().toISOString(),
+    env: process.env.NODE_ENV || "unknown"
+  });
+});
 // CORS – update origins as needed
 app.use(cors({
   origin: [
