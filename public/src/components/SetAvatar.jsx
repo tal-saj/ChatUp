@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import styled from "styled-components";
 import axios from "axios";
 import { Buffer } from "buffer";
@@ -16,13 +16,16 @@ export default function SetAvatar() {
   const [selectedAvatar, setSelectedAvatar] = useState(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const toastOptions = {
-    position: "bottom-right",
-    autoClose: 5000,
-    pauseOnHover: true,
-    draggable: true,
-    theme: "dark",
-  };
+  const toastOptions = useMemo(
+    () => ({
+      position: "bottom-right",
+      autoClose: 5000,
+      pauseOnHover: true,
+      draggable: true,
+      theme: "dark",
+    }),
+    []
+  );
 
   // Redirect if not logged in
   useEffect(() => {
@@ -31,7 +34,7 @@ export default function SetAvatar() {
     }
   }, [navigate]);
 
-  // Generate random avatars
+  // Generate random avatars – only once on mount
   useEffect(() => {
     const generateAvatars = async () => {
       try {
@@ -39,11 +42,8 @@ export default function SetAvatar() {
 
         for (let i = 0; i < 4; i++) {
           const randomString = Math.random().toString(36).substring(2);
-          const svgString = multiavatar(randomString); // returns SVG string
-
-          // Safer base64 encoding for SVG
+          const svgString = multiavatar(randomString);
           const base64 = Buffer.from(svgString).toString("base64");
-
           avatarData.push(base64);
         }
 
@@ -57,7 +57,7 @@ export default function SetAvatar() {
     };
 
     generateAvatars();
-  }, [toastOptions]);
+  }, []); // ← empty deps = run once, safe because toastOptions is memoized
 
   const setProfilePicture = async () => {
     if (selectedAvatar === undefined) {
@@ -83,7 +83,6 @@ export default function SetAvatar() {
       });
 
       if (data.isSet) {
-        // Update local user data
         const updatedUser = {
           ...user,
           isAvatarImageSet: true,
@@ -126,7 +125,7 @@ export default function SetAvatar() {
           <div className="avatars">
             {avatars.map((avatar, index) => (
               <div
-                key={index} // index is fine here since avatars are generated once
+                key={index}
                 className={`avatar ${selectedAvatar === index ? "selected" : ""}`}
                 onClick={() => setSelectedAvatar(index)}
                 role="button"
@@ -161,6 +160,7 @@ export default function SetAvatar() {
   );
 }
 
+// Container styled component remains unchanged
 const Container = styled.div`
   display: flex;
   justify-content: center;
