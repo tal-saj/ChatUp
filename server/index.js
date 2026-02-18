@@ -7,6 +7,8 @@ const authRoutes = require("./routes/auth");
 const messageRoutes = require("./routes/messages");
 
 require("dotenv").config();
+console.log("MONGO_URL from env:", process.env.MONGO_URL ? "present" : "MISSING");
+console.log("MONGO_URL first 30 chars:", process.env.MONGO_URL?.substring(0, 30) || "not set");
 
 const app = express();
 
