@@ -11,63 +11,89 @@ export default function ChatContainer({ currentChat, socket }) {
   const scrollRef = useRef();
   const [arrivalMessage, setArrivalMessage] = useState(null);
 
-  useEffect(async () => {
-    const data = await JSON.parse(
-      localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY)
-    );
-    const response = await axios.post(recieveMessageRoute, {
-      from: data._id,
-      to: currentChat._id,
-    });
-    setMessages(response.data);
-  }, [currentChat]);
+  // Get current user once from localStorage
+  const currentUser = JSON.parse(
+    localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY)
+  );
 
+  // Load previous messages when currentChat changes
   useEffect(() => {
-    const getCurrentChat = async () => {
-      if (currentChat) {
-        await JSON.parse(
-          localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY)
-        )._id;
+    const fetchMessages = async () => {
+      try {
+        if (!currentUser?._id || !currentChat?._id) return;
+
+        const response = await axios.post(recieveMessageRoute, {
+          from: currentUser._id,
+          to: currentChat._id,
+        });
+
+        setMessages(response.data || []); // fallback to empty array if null
+      } catch (error) {
+        console.error("Failed to load messages:", error);
+        // Optional: show toast notification here
       }
     };
-    getCurrentChat();
-  }, [currentChat]);
 
-  const handleSendMsg = async (msg) => {
-    const data = await JSON.parse(
-      localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY)
-    );
-    socket.current.emit("send-msg", {
-      to: currentChat._id,
-      from: data._id,
-      msg,
-    });
-    await axios.post(sendMessageRoute, {
-      from: data._id,
-      to: currentChat._id,
-      message: msg,
-    });
+    fetchMessages();
+  }, [currentChat, currentUser]);
 
-    const msgs = [...messages];
-    msgs.push({ fromSelf: true, message: msg });
-    setMessages(msgs);
-  };
-
+  // Handle incoming messages via socket
   useEffect(() => {
-    if (socket.current) {
-      socket.current.on("msg-recieve", (msg) => {
-        setArrivalMessage({ fromSelf: false, message: msg });
-      });
+    if (!socket.current) return;
+
+    const handleMsgReceive = (msg) => {
+      setArrivalMessage({ fromSelf: false, message: msg });
+    };
+
+    socket.current.on("msg-recieve", handleMsgReceive);
+
+    // Cleanup listener when component unmounts or socket changes
+    return () => {
+      socket.current.off("msg-recieve", handleMsgReceive);
+    };
+  }, [socket]);
+
+  // Add arrived message to state
+  useEffect(() => {
+    if (arrivalMessage) {
+      setMessages((prev) => [...prev, arrivalMessage]);
+      setArrivalMessage(null); // clear after adding
     }
-  }, []);
-
-  useEffect(() => {
-    arrivalMessage && setMessages((prev) => [...prev, arrivalMessage]);
   }, [arrivalMessage]);
 
+  // Auto-scroll to bottom when messages change
   useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (scrollRef.current) {
+      scrollRef.current.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages]);
+
+  const handleSendMsg = async (msg) => {
+    if (!msg.trim() || !currentUser?._id || !currentChat?._id) return;
+
+    try {
+      // Emit via socket (real-time)
+      socket.current.emit("send-msg", {
+        to: currentChat._id,
+        from: currentUser._id,
+        msg,
+      });
+
+      // Save to DB via API
+      await axios.post(sendMessageRoute, {
+        from: currentUser._id,
+        to: currentChat._id,
+        message: msg,
+      });
+
+      // Optimistic UI update
+      const newMsg = { fromSelf: true, message: msg };
+      setMessages((prev) => [...prev, newMsg]);
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      // Optional: revert optimistic update or show error toast
+    }
+  };
 
   return (
     <Container>
@@ -76,7 +102,7 @@ export default function ChatContainer({ currentChat, socket }) {
           <div className="avatar">
             <img
               src={`data:image/svg+xml;base64,${currentChat.avatarImage}`}
-              alt=""
+              alt="avatar"
             />
           </div>
           <div className="username">
@@ -85,23 +111,24 @@ export default function ChatContainer({ currentChat, socket }) {
         </div>
         <Logout />
       </div>
+
       <div className="chat-messages">
-        {messages.map((message) => {
-          return (
-            <div ref={scrollRef} key={uuidv4()}>
-              <div
-                className={`message ${
-                  message.fromSelf ? "sended" : "recieved"
-                }`}
-              >
-                <div className="content ">
-                  <p>{message.message}</p>
-                </div>
+        {messages.map((message, index) => (
+          <div
+            key={message._id || index} // Prefer DB _id if your messages have it
+            ref={index === messages.length - 1 ? scrollRef : null} // Only ref last message
+          >
+            <div
+              className={`message ${message.fromSelf ? "sended" : "recieved"}`}
+            >
+              <div className="content">
+                <p>{message.message}</p>
               </div>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
+
       <ChatInput handleSendMsg={handleSendMsg} />
     </Container>
   );
@@ -112,23 +139,28 @@ const Container = styled.div`
   grid-template-rows: 10% 80% 10%;
   gap: 0.1rem;
   overflow: hidden;
+
   @media screen and (min-width: 720px) and (max-width: 1080px) {
     grid-template-rows: 15% 70% 15%;
   }
+
   .chat-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 0 2rem;
+
     .user-details {
       display: flex;
       align-items: center;
       gap: 1rem;
+
       .avatar {
         img {
           height: 3rem;
         }
       }
+
       .username {
         h3 {
           color: white;
@@ -136,12 +168,14 @@ const Container = styled.div`
       }
     }
   }
+
   .chat-messages {
     padding: 1rem 2rem;
     display: flex;
     flex-direction: column;
     gap: 1rem;
     overflow: auto;
+
     &::-webkit-scrollbar {
       width: 0.2rem;
       &-thumb {
@@ -150,9 +184,11 @@ const Container = styled.div`
         border-radius: 1rem;
       }
     }
+
     .message {
       display: flex;
       align-items: center;
+
       .content {
         max-width: 40%;
         overflow-wrap: break-word;
@@ -160,19 +196,24 @@ const Container = styled.div`
         font-size: 1.1rem;
         border-radius: 1rem;
         color: #d1d1d1;
+
         @media screen and (min-width: 720px) and (max-width: 1080px) {
           max-width: 70%;
         }
       }
     }
+
     .sended {
       justify-content: flex-end;
+
       .content {
         background-color: #4f04ff21;
       }
     }
+
     .recieved {
       justify-content: flex-start;
+
       .content {
         background-color: #9900ff20;
       }

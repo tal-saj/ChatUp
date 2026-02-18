@@ -3,25 +3,29 @@ import { BsEmojiSmileFill } from "react-icons/bs";
 import { IoMdSend } from "react-icons/io";
 import styled from "styled-components";
 import Picker from "emoji-picker-react";
+import { EmojiStyle } from "emoji-picker-react"; // Import for v4+ to avoid warnings
 
 export default function ChatInput({ handleSendMsg }) {
   const [msg, setMsg] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const handleEmojiPickerhideShow = () => {
-    setShowEmojiPicker(!showEmojiPicker);
+
+  const handleEmojiPickerToggle = () => {
+    setShowEmojiPicker((prev) => !prev);
   };
 
-  const handleEmojiClick = (event, emojiObject) => {
-    let message = msg;
-    message += emojiObject.emoji;
-    setMsg(message);
+  const handleEmojiClick = (emojiData) => {
+    // emojiData is the first param in v4+
+    const emoji = emojiData.emoji;
+    setMsg((prev) => prev + emoji);
   };
 
   const sendChat = (event) => {
     event.preventDefault();
-    if (msg.length > 0) {
-      handleSendMsg(msg);
+    const trimmedMsg = msg.trim();
+    if (trimmedMsg.length > 0) {
+      handleSendMsg(trimmedMsg);
       setMsg("");
+      setShowEmojiPicker(false); // Optional: close picker after send
     }
   };
 
@@ -29,18 +33,33 @@ export default function ChatInput({ handleSendMsg }) {
     <Container>
       <div className="button-container">
         <div className="emoji">
-          <BsEmojiSmileFill onClick={handleEmojiPickerhideShow} />
-          {showEmojiPicker && <Picker onEmojiClick={handleEmojiClick} />}
+          <BsEmojiSmileFill
+            onClick={handleEmojiPickerToggle}
+            aria-label="Toggle emoji picker"
+          />
+          {showEmojiPicker && (
+            <Picker
+              onEmojiClick={handleEmojiClick}
+              emojiStyle={EmojiStyle.NATIVE} // or GOOGLE / TWITTER — prevents console errors
+              // Optional props for better UX:
+              // height={350}
+              // width="100%"
+              // previewConfig={{ showPreview: false }}
+              // skinTonesDisabled
+            />
+          )}
         </div>
       </div>
-      <form className="input-container" onSubmit={(event) => sendChat(event)}>
+
+      <form className="input-container" onSubmit={sendChat}>
         <input
           type="text"
-          placeholder="type your message here"
-          onChange={(e) => setMsg(e.target.value)}
+          placeholder="Type your message here..."
           value={msg}
+          onChange={(e) => setMsg(e.target.value)}
+          aria-label="Message input"
         />
-        <button type="submit">
+        <button type="submit" aria-label="Send message">
           <IoMdSend />
         </button>
       </form>
@@ -54,50 +73,63 @@ const Container = styled.div`
   grid-template-columns: 5% 95%;
   background-color: #080420;
   padding: 0 2rem;
+
   @media screen and (min-width: 720px) and (max-width: 1080px) {
     padding: 0 1rem;
     gap: 1rem;
   }
+
   .button-container {
     display: flex;
     align-items: center;
     color: white;
     gap: 1rem;
+
     .emoji {
       position: relative;
+
       svg {
         font-size: 1.5rem;
         color: #ffff00c8;
         cursor: pointer;
       }
+
       .emoji-picker-react {
         position: absolute;
         top: -350px;
+        left: 0;
         background-color: #080420;
         box-shadow: 0 5px 10px #9a86f3;
         border-color: #9a86f3;
+        z-index: 10;
+
         .emoji-scroll-wrapper::-webkit-scrollbar {
           background-color: #080420;
           width: 5px;
-          &-thumb {
-            background-color: #9a86f3;
-          }
         }
+
+        .emoji-scroll-wrapper::-webkit-scrollbar-thumb {
+          background-color: #9a86f3;
+        }
+
         .emoji-categories {
           button {
             filter: contrast(0);
           }
         }
+
         .emoji-search {
           background-color: transparent;
           border-color: #9a86f3;
         }
+
         .emoji-group:before {
           background-color: #080420;
         }
       }
     }
   }
+
   .input-container {
     width: 100%;
     border-radius: 2rem;
@@ -105,6 +137,7 @@ const Container = styled.div`
     align-items: center;
     gap: 2rem;
     background-color: #ffffff34;
+
     input {
       width: 90%;
       height: 60%;
@@ -117,10 +150,12 @@ const Container = styled.div`
       &::selection {
         background-color: #9a86f3;
       }
+
       &:focus {
         outline: none;
       }
     }
+
     button {
       padding: 0.3rem 2rem;
       border-radius: 2rem;
@@ -129,12 +164,16 @@ const Container = styled.div`
       align-items: center;
       background-color: #9a86f3;
       border: none;
+      cursor: pointer;
+
       @media screen and (min-width: 720px) and (max-width: 1080px) {
         padding: 0.3rem 1rem;
+
         svg {
           font-size: 1rem;
         }
       }
+
       svg {
         font-size: 2rem;
         color: white;
