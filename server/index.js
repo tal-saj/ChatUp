@@ -12,10 +12,25 @@ const app = express();
 
 app.get("/test-db", async (req, res) => {
   try {
+    console.log("MONGO_URL present?", !!process.env.MONGO_URL);
+    console.log("MONGO_URL value (first 20 chars):", process.env.MONGO_URL?.substring(0, 20) || "missing");
+
+    if (!mongoose.connection.readyState) {
+      return res.status(500).json({
+        error: "Mongoose not connected",
+        readyState: mongoose.connection.readyState, // 0 = disconnected, 1 = connected
+      });
+    }
+
     await mongoose.connection.db.admin().ping();
-    res.json({ status: "MongoDB connected OK" });
+    res.json({ status: "MongoDB ping successful" });
   } catch (err) {
-    res.status(500).json({ error: "MongoDB connection failed", details: err.message });
+    console.error("DB test error:", err.message, err.stack);
+    res.status(500).json({
+      error: "MongoDB connection failed",
+      details: err.message,
+      stack: err.stack?.substring(0, 300), // limit length for logs
+    });
   }
 });
 
