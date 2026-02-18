@@ -1,3 +1,6 @@
+const express = require("express");
+const router = express.Router();
+
 const {
   login,
   register,
@@ -6,12 +9,16 @@ const {
   logOut,
 } = require("../controllers/userController");
 
-const router = require("express").Router();
 
-router.post("/login", login);
-router.post("/register", register);
-router.get("/allusers/:id", getAllUsers);
-router.post("/setavatar/:id", setAvatar);
-router.get("/logout/:id", logOut);
+// Public routes
+router.post("/login", /* authLimiter, validateLogin, */ login);
+router.post("/register", /* authLimiter, validateRegister, */ register);
+
+// Protected routes (should use auth middleware in production)
+router.get("/allusers/:id", /* authMiddleware, */ getAllUsers);
+router.post("/set-avatar/:id", /* authMiddleware, */ setAvatar);
+
+// Logout – changed to POST (more secure)
+router.post("/logout", /* authMiddleware, */ logOut);
 
 module.exports = router;
