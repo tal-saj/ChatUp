@@ -9,6 +9,16 @@ const messageRoutes = require("./routes/messages");
 require("dotenv").config();
 
 const app = express();
+
+app.get("/test-db", async (req, res) => {
+  try {
+    await mongoose.connection.db.admin().ping();
+    res.json({ status: "MongoDB connected OK" });
+  } catch (err) {
+    res.status(500).json({ error: "MongoDB connection failed", details: err.message });
+  }
+});
+
 app.get("/debug", (req, res) => {
   res.json({
     message: "Backend is alive",
@@ -45,6 +55,19 @@ app.use((err, req, res, next) => {
   console.error("Server error:", err);
   res.status(500).json({ error: "Internal Server Error" });
 });
+app.use((err, req, res, next) => {
+  console.error("SERVER ERROR:", {
+    message: err.message,
+    stack: err.stack,
+    path: req.path,
+    method: req.method,
+    body: req.body,
+  });
 
+  res.status(500).json({
+    error: "Internal Server Error",
+    message: process.env.NODE_ENV === "development" ? err.message : undefined,
+  });
+});
 // Export for Vercel
 module.exports = app;
