@@ -9,7 +9,12 @@ const messageRoutes = require("./routes/messages");
 require("dotenv").config();
 console.log("MONGO_URL from env:", process.env.MONGO_URL ? "present" : "MISSING");
 console.log("MONGO_URL first 30 chars:", process.env.MONGO_URL?.substring(0, 30) || "not set");
-
+console.log("=== ENV DEBUG START ===");
+console.log("MONGO_URL exists?", !!process.env.MONGO_URL);
+console.log("MONGO_URL length:", process.env.MONGO_URL?.length || 0);
+console.log("MONGO_URL starts with:", process.env.MONGO_URL?.substring(0, 20) || "MISSING");
+console.log("All env keys:", Object.keys(process.env).filter(k => k.includes("MONGO")));
+console.log("=== ENV DEBUG END ===");
 const app = express();
 
 app.get("/test-db", async (req, res) => {
@@ -23,6 +28,7 @@ app.get("/test-db", async (req, res) => {
         readyState: mongoose.connection.readyState, // 0 = disconnected, 1 = connected
       });
     }
+    await mongoose.connection.db.admin().ping();
 
     await mongoose.connection.db.admin().ping();
     res.json({ status: "MongoDB ping successful" });
