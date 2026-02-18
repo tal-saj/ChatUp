@@ -34,30 +34,31 @@ export default function SetAvatar() {
     }
   }, [navigate]);
 
-  // Generate random avatars – only once on mount
-  useEffect(() => {
-    const generateAvatars = async () => {
-      try {
-        const avatarData = [];
+useEffect(() => {
+  const generateAvatars = async () => {
+    try {
+      const avatarData = [];
 
-        for (let i = 0; i < 4; i++) {
-          const randomString = Math.random().toString(36).substring(2);
-          const svgString = multiavatar(randomString);
-          const base64 = Buffer.from(svgString).toString("base64");
-          avatarData.push(base64);
-        }
-
-        setAvatars(avatarData);
-      } catch (error) {
-        console.error("Avatar generation failed:", error);
-        toast.error("Failed to generate avatars", toastOptions);
-      } finally {
-        setIsLoading(false);
+      for (let i = 0; i < 4; i++) {
+        const randomString = Math.random().toString(36).substring(2);
+        const svgString = multiavatar(randomString);
+        const base64 = Buffer.from(svgString).toString("base64");
+        avatarData.push(base64);
       }
-    };
 
-    generateAvatars();
-  }, []); // ← empty deps = run once, safe because toastOptions is memoized
+      setAvatars(avatarData);
+    } catch (error) {
+      console.error("Avatar generation failed:", error);
+      toast.error("Failed to generate avatars", toastOptions);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  generateAvatars();
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
 
   const setProfilePicture = async () => {
     if (selectedAvatar === undefined) {
