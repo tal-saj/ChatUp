@@ -30,15 +30,7 @@ console.log("=== MONGO ENV DEBUG END ===");
 // ────────────────────────────────────────────────
 // CORS – allow frontend domains
 // ────────────────────────────────────────────────
-app.use(cors({
-  origin: [
-    "https://chat-up-frontend-three.vercel.app",
-    "http://localhost:3000",
-  ],
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-}));
+app.use(cors());
 
 app.use(express.json());
 
