@@ -1,7 +1,7 @@
 // src/utils/APIRoutes.js
 
 // Use environment variable if available (for production), fallback to localhost for dev
-export const host = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+export const host = process.env.REACT_APP_BACKEND_URL;
 
 export const loginRoute    = `${host}/api/auth/login`;
 export const registerRoute = `${host}/api/auth/register`;

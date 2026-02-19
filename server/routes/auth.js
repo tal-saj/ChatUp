@@ -16,7 +16,7 @@ router.post("/register", /* authLimiter, validateRegister, */ register);
 
 // Protected routes (should use auth middleware in production)
 router.get("/allusers/:id", /* authMiddleware, */ getAllUsers);
-router.post("/set-avatar/:id", /* authMiddleware, */ setAvatar);
+router.post("/setavatar/:id", /* authMiddleware, */ setAvatar);
 
 // Logout – changed to POST (more secure)
 router.post("/logout", /* authMiddleware, */ logOut);
