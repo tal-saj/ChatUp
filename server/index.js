@@ -4,6 +4,8 @@ const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 
+const connectDB = require("./lib/connectDB");
+
 const authRoutes = require("./routes/auth");
 const messageRoutes = require("./routes/messages");
 
@@ -11,25 +13,27 @@ require("dotenv").config();
 
 const app = express();
 
+
 // ────────────────────────────────────────────────
-// Debug MongoDB env var (keep this for now – remove later)
+// ENV DEBUG (optional – remove later)
 // ────────────────────────────────────────────────
 console.log("=== MONGO ENV DEBUG ===");
 console.log("MONGO_URL exists?", !!process.env.MONGO_URL);
 console.log("MONGO_URL length:", process.env.MONGO_URL?.length || 0);
-console.log("MONGO_URL first 60 chars:", process.env.MONGO_URL?.substring(0, 60) || "MISSING");
-console.log("Has cluster?", process.env.MONGO_URL?.includes(".mongodb.net") || false);
-console.log("Has database name?", process.env.MONGO_URL?.includes("/") && process.env.MONGO_URL?.indexOf("/") > process.env.MONGO_URL?.indexOf(".net") || false);
+console.log(
+  "MONGO_URL first 60 chars:",
+  process.env.MONGO_URL?.substring(0, 60) || "MISSING"
+);
 console.log("=== MONGO ENV DEBUG END ===");
 
+
 // ────────────────────────────────────────────────
-// CORS – allow your frontend domains only
+// CORS – allow frontend domains
 // ────────────────────────────────────────────────
 app.use(cors({
   origin: [
     "https://chat-up-frontend-three.vercel.app",
     "http://localhost:3000",
-    // Add preview domains or custom domain later if needed
   ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -38,61 +42,49 @@ app.use(cors({
 
 app.use(express.json());
 
-// ────────────────────────────────────────────────
-// MongoDB connection – with better logging & timeout
-// ────────────────────────────────────────────────
-if (!process.env.MONGO_URL) {
-  console.error("CRITICAL: MONGO_URL is missing from environment variables");
-} else {
-  console.log("Attempting MongoDB connection...");
 
-  mongoose
-    .connect(process.env.MONGO_URL, {
-      serverSelectionTimeoutMS: 30000,   // Fail fast in serverless
-      connectTimeoutMS: 30000,
-      socketTimeoutMS: 45000,
-    })
-    .then(() => {
-      console.log("MongoDB connected SUCCESSFULLY");
-    })
-    .catch((err) => {
-      console.error("MongoDB connection FAILED:");
-      console.error("Error name:", err.name);
-      console.error("Error message:", err.message);
-      console.error("Full error:", JSON.stringify(err, null, 2));
+// ────────────────────────────────────────────────
+// ⭐ AUTO CONNECT DB BEFORE EVERY REQUEST
+// (Critical for Vercel serverless)
+// ────────────────────────────────────────────────
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error("DB connection middleware error:", err.message);
+    res.status(500).json({
+      error: "Database connection failed",
+      details: err.message,
     });
+  }
+});
 
-  // Listen to connection events
-  mongoose.connection.on("connected", () => console.log("Mongoose event: connected"));
-  mongoose.connection.on("error", (err) => console.error("Mongoose event: error", err.message));
-  mongoose.connection.on("disconnected", () => console.log("Mongoose event: disconnected"));
-}
 
 // ────────────────────────────────────────────────
-// Debug routes (keep for now, remove later in production)
+// Debug routes
 // ────────────────────────────────────────────────
 app.get("/debug", (req, res) => {
   res.json({
     message: "Backend is alive",
     time: new Date().toISOString(),
     env: process.env.NODE_ENV || "unknown",
-    mongoReadyState: mongoose.connection.readyState, // 0=disconnected, 1=connected
+    mongoReadyState: mongoose.connection.readyState, // should now be 1
   });
 });
 
+
 app.get("/test-db", async (req, res) => {
   try {
-    if (mongoose.connection.readyState !== 1) {
-      return res.status(503).json({
-        error: "Mongoose not connected",
-        readyState: mongoose.connection.readyState,
-      });
-    }
-
     await mongoose.connection.db.admin().ping();
-    res.json({ status: "MongoDB ping successful" });
+
+    res.json({
+      status: "MongoDB ping successful",
+      readyState: mongoose.connection.readyState,
+    });
+
   } catch (err) {
-    console.error("DB test error:", err.message, err.stack?.substring(0, 400));
+    console.error("DB test error:", err.message);
     res.status(500).json({
       error: "MongoDB connection failed",
       details: err.message,
@@ -100,14 +92,16 @@ app.get("/test-db", async (req, res) => {
   }
 });
 
+
 // ────────────────────────────────────────────────
 // Routes
 // ────────────────────────────────────────────────
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 
+
 // ────────────────────────────────────────────────
-// Global error handler (recommended for Vercel)
+// Global error handler
 // ────────────────────────────────────────────────
 app.use((err, req, res, next) => {
   console.error("SERVER ERROR:", {
@@ -120,10 +114,9 @@ app.use((err, req, res, next) => {
 
   res.status(500).json({
     error: "Internal Server Error",
-    // Only show message in development (optional)
-    // message: process.env.NODE_ENV === "development" ? err.message : undefined,
   });
 });
+
 
 // ────────────────────────────────────────────────
 // Export for Vercel
