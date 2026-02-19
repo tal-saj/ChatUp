@@ -48,9 +48,9 @@ if (!process.env.MONGO_URL) {
 
   mongoose
     .connect(process.env.MONGO_URL, {
-      serverSelectionTimeoutMS: 5000,   // Fail fast in serverless
-      connectTimeoutMS: 5000,
-      socketTimeoutMS: 20000,
+      serverSelectionTimeoutMS: 30000,   // Fail fast in serverless
+      connectTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
     })
     .then(() => {
       console.log("MongoDB connected SUCCESSFULLY");
