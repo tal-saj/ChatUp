@@ -39,7 +39,7 @@ export default function SetAvatar() {
       try {
         const avatarData = [];
 
-        for (let i = 0; i = 4; i++) {
+        for (let i = 0; i < 4; i++) {
           const seed = Math.random().toString(36).substring(2);
           const svg = multiavatar(seed);
           const base64 = Buffer.from(svg).toString("base64");
