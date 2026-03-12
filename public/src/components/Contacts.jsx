@@ -29,25 +29,40 @@ export default function Contacts({ contacts, changeChat }) {
 
   if (!currentUserName || !currentUserImage) {
     return (
-      <div className="h-full flex items-center justify-center text-gray-500 bg-gray-950">
-        Loading...
+      <div className="h-full flex items-center justify-center text-slate-400 bg-slate-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 rounded-full border-3 border-slate-300 border-t-slate-500 animate-spin" />
+          <p className="text-sm font-medium">Loading contacts...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full flex-col bg-gradient-to-b from-gray-950 via-gray-900 to-black">
+    <div className="flex h-full flex-col bg-gradient-to-b from-slate-50 via-slate-100 to-white">
 
-      {/* Logo / Brand */}
-      <div className="shrink-0 flex items-center justify-center gap-3 py-5 px-4 border-b border-gray-800/50">
-        <img src={Logo} alt="ChatUp" className="h-8 w-auto" />
-        <h3 className="text-xl font-bold tracking-tight text-white">
+      {/* Logo / Brand header */}
+      <div className="
+        shrink-0 flex items-center justify-center gap-3 py-5 px-4
+        border-b border-slate-200/70 bg-white/60 backdrop-blur-xl
+        shadow-sm
+      ">
+        <img 
+          src={Logo} 
+          alt="ChatUp" 
+          className="h-8 w-auto drop-shadow-sm transition-transform hover:scale-105" 
+        />
+        <h3 className="text-xl font-bold tracking-tight text-slate-800">
           ChatUp
         </h3>
       </div>
 
       {/* Contacts list */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-2 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
+      <div className="
+        flex-1 overflow-y-auto px-3 py-4 space-y-2.5
+        scrollbar-thin scrollbar-thumb-slate-300/70 scrollbar-track-transparent
+        scrollbar-thumb-rounded-full
+      ">
         {contacts.map((contact, index) => {
           const isSelected = index === currentSelected;
 
@@ -64,24 +79,24 @@ export default function Contacts({ contacts, changeChat }) {
                 }
               }}
               className={`
-                group flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer
-                transition-all duration-200
+                group flex items-center gap-3.5 px-4 py-3.5 rounded-xl cursor-pointer
+                transition-all duration-250 ease-out
                 ${
                   isSelected
-                    ? "bg-gradient-to-r from-indigo-600/30 to-purple-600/30 border border-indigo-500/40 shadow-md shadow-indigo-900/20"
-                    : "hover:bg-gray-800/60 active:bg-gray-700/70"
+                    ? "bg-white border border-slate-300/80 shadow-md shadow-slate-400/30 scale-[1.015]"
+                    : "hover:bg-white/80 active:bg-slate-100/70 hover:shadow-sm"
                 }
-                focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:ring-offset-2 focus:ring-offset-gray-950
+                focus:outline-none focus:ring-2 focus:ring-slate-400/40 focus:ring-offset-2 focus:ring-offset-slate-50
               `}
             >
               <div className="relative flex-shrink-0">
                 <div
                   className={`
-                    h-12 w-12 rounded-full overflow-hidden ring-2 transition-all
+                    h-12 w-12 rounded-full overflow-hidden ring-2 transition-all duration-200
                     ${
                       isSelected
-                        ? "ring-indigo-500 ring-offset-2 ring-offset-gray-950"
-                        : "ring-gray-700/50 group-hover:ring-gray-600"
+                        ? "ring-slate-500 ring-offset-2 ring-offset-white shadow-inner"
+                        : "ring-slate-300/60 group-hover:ring-slate-400"
                     }
                   `}
                 >
@@ -93,15 +108,15 @@ export default function Contacts({ contacts, changeChat }) {
                   />
                 </div>
 
-                {/* Optional online status dot – can be wired later */}
-                {/* <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-gray-950"></span> */}
+                {/* Optional online dot – can be added later when online status is implemented */}
+                {/* <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white"></span> */}
               </div>
 
               <div className="min-w-0 flex-1">
                 <h3
                   className={`
-                    font-medium truncate
-                    ${isSelected ? "text-white" : "text-gray-200 group-hover:text-white"}
+                    font-medium truncate text-base
+                    ${isSelected ? "text-slate-900" : "text-slate-700 group-hover:text-slate-900"}
                   `}
                 >
                   {contact.username}
@@ -112,10 +127,18 @@ export default function Contacts({ contacts, changeChat }) {
         })}
       </div>
 
-      {/* Current user – bottom bar */}
-      <div className="shrink-0 border-t border-gray-800/50 bg-gray-900/70 backdrop-blur-sm px-4 py-4 flex items-center gap-3">
+      {/* Current user – bottom fixed bar */}
+      <div className="
+        shrink-0 border-t border-slate-200/70
+        bg-white/70 backdrop-blur-xl px-4 py-4
+        flex items-center gap-3.5 shadow-sm
+      ">
         <div className="relative flex-shrink-0">
-          <div className="h-12 w-12 rounded-full overflow-hidden ring-2 ring-purple-500/40 ring-offset-2 ring-offset-gray-950">
+          <div className="
+            h-12 w-12 rounded-full overflow-hidden 
+            ring-2 ring-slate-400/50 ring-offset-2 ring-offset-white
+            shadow-sm
+          ">
             <img
               src={`data:image/svg+xml;base64,${currentUserImage}`}
               alt="Your avatar"
@@ -124,16 +147,16 @@ export default function Contacts({ contacts, changeChat }) {
           </div>
         </div>
 
-        <div className="min-w-0">
-          <h2 className="font-semibold text-white truncate">
+        <div className="min-w-0 flex-1">
+          <h2 className="font-semibold text-slate-900 truncate">
             {currentUserName}
           </h2>
-          <p className="text-xs text-gray-400">You</p>
+          <p className="text-xs text-slate-500 font-medium">You</p>
         </div>
 
-        {/* Optional: settings / logout icon here later */}
-        {/* <button className="ml-auto p-2 rounded-full hover:bg-gray-800/60">
-          <Settings size={20} className="text-gray-400" />
+        {/* Optional: settings icon or more actions */}
+        {/* <button className="ml-auto p-2.5 rounded-full hover:bg-slate-100 transition-colors">
+          <Settings size={20} className="text-slate-500" />
         </button> */}
       </div>
     </div>

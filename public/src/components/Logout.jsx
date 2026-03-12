@@ -19,29 +19,29 @@ export default function Logout() {
         localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY) || "{}"
       );
 
-      // If no user → just clear and redirect (edge case)
+      // Edge case: no user data → just clear & redirect
       if (!userData?._id) {
         localStorage.clear();
         navigate("/login");
         return;
       }
 
-      // POST is more correct for logout (session invalidation)
+      // POST request to invalidate session (recommended)
       const response = await axios.post(logoutRoute, {
         userId: userData._id,
       });
 
-      // Adjust condition based on your actual backend response
+      // Adjust based on your backend response structure
       if (response.status === 200 || response.data?.success) {
         localStorage.clear();
         navigate("/login");
       } else {
-        console.warn("Logout unsuccessful:", response.data);
-        // Optional: toast.error("Logout failed. Please try again.")
+        console.warn("Logout may have failed:", response.data);
+        // Optional: toast.warning("Logout incomplete. You may need to close the tab.")
       }
     } catch (error) {
-      console.error("Logout failed:", error);
-      // Optional: toast.error("Something went wrong. Please try again.")
+      console.error("Logout error:", error);
+      // Optional: toast.error("Could not log out. Please try again.")
     } finally {
       setIsLoggingOut(false);
     }
@@ -55,23 +55,24 @@ export default function Logout() {
       title="Log out"
       className={`
         relative flex h-10 w-10 items-center justify-center rounded-full
-        bg-gradient-to-br from-gray-800 to-gray-900
-        text-gray-300 hover:text-white
-        transition-all duration-200
-        hover:scale-110 hover:shadow-lg hover:shadow-purple-900/30
-        focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:ring-offset-2 focus:ring-offset-gray-950
-        disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none
+        bg-white/80 backdrop-blur-sm border border-slate-200/70
+        text-slate-600 hover:text-slate-800
+        shadow-sm hover:shadow-md hover:shadow-slate-300/40
+        transition-all duration-200 ease-out
+        hover:scale-110 active:scale-95
+        focus:outline-none focus:ring-2 focus:ring-slate-400/50 focus:ring-offset-2 focus:ring-offset-white
+        disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-sm
       `}
     >
       {isLoggingOut ? (
-        <Loader2 size={20} className="animate-spin" />
+        <Loader2 size={20} className="animate-spin text-slate-500" />
       ) : (
         <LogOut size={20} />
       )}
 
-      {/* Optional micro pulse animation while logging out */}
+      {/* Subtle ripple effect during logout */}
       {isLoggingOut && (
-        <span className="absolute inset-0 rounded-full bg-purple-600/20 animate-ping" />
+        <span className="absolute inset-0 rounded-full bg-slate-300/30 animate-ping pointer-events-none" />
       )}
     </button>
   );

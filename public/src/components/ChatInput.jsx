@@ -1,7 +1,7 @@
 // ChatInput.jsx
 import React, { useState, useRef, useEffect } from "react";
 import Picker from "emoji-picker-react";
-import { EmojiStyle } from "emoji-picker-react";
+import { EmojiStyle, Theme } from "emoji-picker-react";
 import { Smile, Paperclip, Send } from "lucide-react";
 
 export default function ChatInput({ handleSendMsg }) {
@@ -10,7 +10,7 @@ export default function ChatInput({ handleSendMsg }) {
   const pickerRef = useRef(null);
   const buttonRef = useRef(null);
 
-  // Close picker when clicking outside
+  // Close emoji picker on outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -29,7 +29,7 @@ export default function ChatInput({ handleSendMsg }) {
 
   const onEmojiClick = (emojiData) => {
     setMsg((prev) => prev + emojiData.emoji);
-    // Optional: keep picker open or close → here we keep open
+    // Keeping picker open after selection (common UX choice)
   };
 
   const sendChat = (e) => {
@@ -46,15 +46,17 @@ export default function ChatInput({ handleSendMsg }) {
 
   return (
     <div className="relative px-3 pb-4 pt-2 bg-transparent">
-      {/* Glassmorphic floating container */}
+      {/* Glassmorphic input bar */}
       <div
         className={`
           mx-auto max-w-3xl
-          bg-gray-900/60 backdrop-blur-2xl 
-          border border-gray-700/50 rounded-full 
-          shadow-2xl shadow-black/40
+          bg-white/70 backdrop-blur-2xl 
+          border border-slate-200/70 rounded-full 
+          shadow-lg shadow-slate-400/20
           flex items-center gap-2 px-4 py-3
           transition-all duration-200
+          focus-within:shadow-xl focus-within:shadow-slate-400/30
+          focus-within:bg-white/80
         `}
       >
         {/* Emoji button */}
@@ -62,22 +64,37 @@ export default function ChatInput({ handleSendMsg }) {
           ref={buttonRef}
           type="button"
           onClick={() => setShowEmojiPicker((v) => !v)}
-          className="p-2.5 rounded-full hover:bg-gray-800/60 transition-colors flex-shrink-0"
+          className="
+            p-2.5 rounded-full 
+            hover:bg-slate-100 active:bg-slate-200 
+            transition-all duration-200 flex-shrink-0
+          "
           aria-label="Open emoji picker"
         >
-          <Smile size={22} className="text-yellow-400" />
+          <Smile 
+            size={22} 
+            className="text-slate-500 hover:text-slate-700 transition-colors" 
+          />
         </button>
 
-        {/* Attachment placeholder (future: file upload) */}
+        {/* Attachment button (placeholder) */}
         <button
           type="button"
-          className="p-2.5 rounded-full hover:bg-gray-800/60 transition-colors flex-shrink-0"
-          aria-label="Attach file"
+          className="
+            p-2.5 rounded-full 
+            hover:bg-slate-100 active:bg-slate-200 
+            transition-all duration-200 flex-shrink-0
+          "
+          aria-label="Attach file (coming soon)"
+          disabled
         >
-          <Paperclip size={22} className="text-gray-400" />
+          <Paperclip 
+            size={22} 
+            className="text-slate-400" 
+          />
         </button>
 
-        {/* Input */}
+        {/* Message input */}
         <form onSubmit={sendChat} className="flex-1 flex items-center min-w-0">
           <input
             type="text"
@@ -89,11 +106,12 @@ export default function ChatInput({ handleSendMsg }) {
                 sendChat(e);
               }
             }}
-            placeholder="Message..."
+            placeholder="Type a message..."
             className="
               flex-1 bg-transparent outline-none 
-              text-gray-100 placeholder-gray-500 
+              text-slate-800 placeholder-slate-400 
               text-base min-w-0
+              caret-slate-600
             "
             aria-label="Type your message"
           />
@@ -105,11 +123,12 @@ export default function ChatInput({ handleSendMsg }) {
           onClick={sendChat}
           disabled={!isActive}
           className={`
-            p-3 rounded-full transition-all duration-200 flex items-center justify-center flex-shrink-0
+            p-3 rounded-full transition-all duration-300 flex items-center justify-center flex-shrink-0
+            transform active:scale-95
             ${
               isActive
-                ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50 hover:scale-105"
-                : "bg-gray-800/80 text-gray-500 cursor-not-allowed"
+                ? "bg-gradient-to-r from-slate-700 to-slate-900 text-white shadow-lg shadow-slate-500/30 hover:shadow-xl hover:shadow-slate-600/40 hover:brightness-110 hover:scale-105"
+                : "bg-slate-200 text-slate-400 cursor-not-allowed opacity-70"
             }
           `}
           aria-label="Send message"
@@ -118,26 +137,29 @@ export default function ChatInput({ handleSendMsg }) {
         </button>
       </div>
 
-      {/* Emoji Picker – positioned above */}
+      {/* Emoji Picker – light theme, positioned above */}
       {showEmojiPicker && (
         <div
           ref={pickerRef}
           className="
             absolute bottom-full left-4 right-4 mb-4 
             mx-auto max-w-md 
-            z-50 shadow-2xl shadow-purple-900/30
+            z-50 
+            shadow-2xl shadow-slate-400/30
             rounded-2xl overflow-hidden
+            border border-slate-200/60
           "
         >
           <Picker
             onEmojiClick={onEmojiClick}
             emojiStyle={EmojiStyle.NATIVE}
+            theme={Theme.LIGHT}           // ← important for light mode
             height={360}
             width="100%"
             previewConfig={{ showPreview: false }}
             skinTonesDisabled
             searchDisabled={false}
-            // You can add theme="dark" if the library supports it in your version
+            lazyLoadEmojis={true}
           />
         </div>
       )}

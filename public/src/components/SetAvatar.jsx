@@ -21,7 +21,8 @@ export default function SetAvatar() {
       autoClose: 5000,
       pauseOnHover: true,
       draggable: true,
-      theme: "dark",
+      theme: "light",
+      toastClassName: "!rounded-xl !shadow-lg !border !border-slate-200",
     }),
     []
   );
@@ -33,7 +34,7 @@ export default function SetAvatar() {
     }
   }, [navigate]);
 
-  // Generate avatars
+  // Generate random avatars
   useEffect(() => {
     const generateAvatars = async () => {
       try {
@@ -110,18 +111,29 @@ export default function SetAvatar() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-indigo-950/40 to-purple-950/30 flex items-center justify-center p-6">
-      <div className="w-full max-w-2xl flex flex-col items-center gap-10">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-white flex items-center justify-center p-6">
+
+      <div className="
+        w-full max-w-2xl 
+        bg-white/40 backdrop-blur-2xl border border-slate-200/70
+        rounded-3xl shadow-2xl shadow-slate-300/30
+        p-8 md:p-12
+        flex flex-col items-center gap-10
+        transition-all duration-500
+      ">
+
         {isLoading ? (
-          <div className="flex flex-col items-center gap-6">
-            <div className="h-16 w-16 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin" />
-            <p className="text-gray-400 text-lg">Generating your avatars...</p>
+          <div className="flex flex-col items-center gap-6 py-20">
+            <div className="h-16 w-16 rounded-full border-4 border-slate-300 border-t-slate-600 animate-spin" />
+            <p className="text-slate-500 text-lg font-medium">
+              Preparing your avatar options...
+            </p>
           </div>
         ) : (
           <>
             {/* Title */}
-            <h1 className="text-3xl md:text-4xl font-bold text-white text-center tracking-tight">
-              Choose your profile picture
+            <h1 className="text-3xl md:text-4xl font-extrabold text-slate-800 text-center tracking-tight">
+              Choose Your Profile Picture
             </h1>
 
             {/* Avatars grid */}
@@ -137,29 +149,33 @@ export default function SetAvatar() {
                     className={`
                       group relative flex flex-col items-center gap-3
                       transition-all duration-300
-                      focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-4 focus:ring-offset-gray-950
+                      focus:outline-none focus:ring-2 focus:ring-slate-400/50 focus:ring-offset-4 focus:ring-offset-white
                     `}
                     aria-label={`Select avatar ${index + 1}`}
                   >
                     <div
                       className={`
-                        relative rounded-full p-2 transition-all duration-300
+                        relative rounded-full p-3 transition-all duration-300
                         ${
                           isSelected
-                            ? "bg-gradient-to-br from-indigo-600/30 to-purple-600/30 ring-4 ring-indigo-500/70 ring-offset-4 ring-offset-gray-950 scale-110 shadow-2xl shadow-indigo-900/40"
-                            : "bg-gray-900/40 ring-2 ring-gray-700/50 hover:ring-indigo-500/50 hover:scale-105 hover:shadow-xl hover:shadow-indigo-900/20"
+                            ? "bg-white border-4 border-slate-500/70 ring-4 ring-slate-300/40 shadow-xl shadow-slate-400/40 scale-110"
+                            : "bg-white/70 border-2 border-slate-300/60 hover:border-slate-400 hover:shadow-lg hover:scale-105"
                         }
                       `}
                     >
                       <img
                         src={`data:image/svg+xml;base64,${avatar}`}
                         alt={`Avatar option ${index + 1}`}
-                        className="h-24 w-24 md:h-28 md:w-28 rounded-full object-cover transition-transform"
+                        className="h-24 w-24 md:h-28 md:w-28 rounded-full object-cover transition-transform group-hover:scale-105"
                       />
                     </div>
 
                     {isSelected && (
-                      <span className="absolute -bottom-2 text-xs font-medium px-3 py-1 bg-indigo-600/90 text-white rounded-full shadow-md">
+                      <span className="
+                        absolute -bottom-3 text-xs font-semibold 
+                        px-3 py-1 bg-slate-700 text-white rounded-full 
+                        shadow-md shadow-slate-500/30
+                      ">
                         Selected
                       </span>
                     )}
@@ -173,12 +189,12 @@ export default function SetAvatar() {
               onClick={setProfilePicture}
               disabled={selectedAvatar === undefined || isSubmitting}
               className={`
-                min-w-[240px] px-8 py-4 rounded-xl font-semibold text-lg
+                min-w-[240px] px-8 py-4 rounded-xl font-semibold text-lg tracking-wide
                 transition-all duration-300 transform
                 ${
                   selectedAvatar !== undefined && !isSubmitting
-                    ? "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-700/30 hover:shadow-xl hover:shadow-indigo-700/40 hover:scale-105 active:scale-95"
-                    : "bg-gray-700 text-gray-400 cursor-not-allowed opacity-70"
+                    ? "bg-gradient-to-r from-slate-700 to-slate-900 text-white shadow-lg shadow-slate-500/30 hover:shadow-xl hover:shadow-slate-600/40 hover:brightness-110 hover:scale-[1.02] active:scale-98"
+                    : "bg-slate-200 text-slate-500 cursor-not-allowed opacity-70"
                 }
               `}
             >
@@ -193,9 +209,9 @@ export default function SetAvatar() {
             </button>
           </>
         )}
-
-        <ToastContainer />
       </div>
+
+      <ToastContainer />
     </div>
   );
 }
