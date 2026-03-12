@@ -1,5 +1,5 @@
+// ChatContainer.jsx
 import React, { useState, useEffect, useRef } from "react";
-import styled from "styled-components";
 import ChatInput from "./ChatInput";
 import Logout from "./Logout";
 import axios from "axios";
@@ -7,63 +7,67 @@ import { sendMessageRoute, recieveMessageRoute } from "../utils/APIRoutes";
 
 export default function ChatContainer({ currentChat, socket }) {
   const [messages, setMessages] = useState([]);
-  const scrollRef = useRef();
+  const [isLoading, setIsLoading] = useState(true);
+  const scrollRef = useRef(null);
   const [arrivalMessage, setArrivalMessage] = useState(null);
 
-  // Get current user once from localStorage
   const currentUser = JSON.parse(
     localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY)
   );
 
-  // Load previous messages when currentChat changes
+  // Load messages
   useEffect(() => {
     const fetchMessages = async () => {
-      try {
-        if (!currentUser?._id || !currentChat?._id) return;
+      if (!currentUser?._id || !currentChat?._id) {
+        setMessages([]);
+        setIsLoading(false);
+        return;
+      }
 
-        const response = await axios.post(recieveMessageRoute, {
+      setIsLoading(true);
+      try {
+        const { data } = await axios.post(recieveMessageRoute, {
           from: currentUser._id,
           to: currentChat._id,
         });
-
-        setMessages(response.data || []); // fallback to empty array if null
-      } catch (error) {
-        console.error("Failed to load messages:", error);
-        // Optional: show toast notification here
+        setMessages(data || []);
+      } catch (err) {
+        console.error("Failed to load messages", err);
+        // You can add toast here later
+      } finally {
+        setIsLoading(false);
       }
     };
 
     fetchMessages();
-  }, [currentChat, currentUser]);
+  }, [currentChat?._id, currentUser?._id]);
 
-  // Handle incoming messages via socket
-useEffect(() => {
-  if (!socket.current) return;
+  // Socket incoming message
+  useEffect(() => {
+    if (!socket?.current) return;
 
-  // ← Copy ref value here
-  const currentSocket = socket.current;
+    const currentSocket = socket.current;
 
-  const handleMsgReceive = (msg) => {
-    setArrivalMessage({ fromSelf: false, message: msg });
-  };
+    const handleReceive = (msg) => {
+      setArrivalMessage({ fromSelf: false, message: msg });
+    };
 
-  currentSocket.on("msg-recieve", handleMsgReceive);
+    currentSocket.on("msg-recieve", handleReceive);
 
-  return () => {
-    // Use the copied value in cleanup
-    currentSocket.off("msg-recieve", handleMsgReceive);
-  };
-}, [socket]);
+    return () => {
+      currentSocket.off("msg-recieve", handleReceive);
+    };
+  }, [socket]);
 
-  // Add arrived message to state
+  // Append arrived message
   useEffect(() => {
     if (arrivalMessage) {
       setMessages((prev) => [...prev, arrivalMessage]);
-      setArrivalMessage(null); // clear after adding
+      setArrivalMessage(null);
     }
   }, [arrivalMessage]);
 
-  // Auto-scroll to bottom when messages change
+  // Auto scroll
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
@@ -71,154 +75,116 @@ useEffect(() => {
   }, [messages]);
 
   const handleSendMsg = async (msg) => {
-    if (!msg.trim() || !currentUser?._id || !currentChat?._id) return;
+    if (!msg?.trim() || !currentUser?._id || !currentChat?._id) return;
+
+    const optimisticMsg = { fromSelf: true, message: msg };
+
+    // Optimistic update
+    setMessages((prev) => [...prev, optimisticMsg]);
 
     try {
-      // Emit via socket (real-time)
       socket.current.emit("send-msg", {
         to: currentChat._id,
         from: currentUser._id,
         msg,
       });
 
-      // Save to DB via API
       await axios.post(sendMessageRoute, {
         from: currentUser._id,
         to: currentChat._id,
         message: msg,
       });
-
-      // Optimistic UI update
-      const newMsg = { fromSelf: true, message: msg };
-      setMessages((prev) => [...prev, newMsg]);
-    } catch (error) {
-      console.error("Failed to send message:", error);
-      // Optional: revert optimistic update or show error toast
+    } catch (err) {
+      console.error("Message send failed", err);
+      // Optional: remove optimistic message or show error
+      setMessages((prev) => prev.filter((m) => m !== optimisticMsg));
     }
   };
 
+  // ────────────────────────────────────────────────
+
   return (
-    <Container>
-      <div className="chat-header">
-        <div className="user-details">
-          <div className="avatar">
+    <div className="relative flex h-full flex-col bg-gradient-to-b from-gray-950 via-gray-900 to-black">
+
+      {/* Header - glassmorphic */}
+      <header className="sticky top-0 z-10 bg-gray-900/60 backdrop-blur-xl border-b border-gray-800/50 px-4 py-3.5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full overflow-hidden ring-2 ring-purple-500/40 ring-offset-2 ring-offset-black flex-shrink-0">
             <img
-              src={`data:image/svg+xml;base64,${currentChat.avatarImage}`}
+              src={`data:image/svg+xml;base64,${currentChat?.avatarImage || ""}`}
               alt="avatar"
+              className="h-full w-full object-cover"
+              onError={(e) => (e.target.src = "/fallback-avatar.png")} // ← add fallback
             />
           </div>
-          <div className="username">
-            <h3>{currentChat.username}</h3>
+          <div>
+            <h3 className="font-semibold text-white tracking-tight">
+              {currentChat?.username || "Chat"}
+            </h3>
+            <p className="text-xs text-emerald-400/90">online</p>
           </div>
         </div>
+
         <Logout />
-      </div>
+      </header>
 
-      <div className="chat-messages">
-        {messages.map((message, index) => (
-          <div
-            key={message._id || index} // Prefer DB _id if your messages have it
-            ref={index === messages.length - 1 ? scrollRef : null} // Only ref last message
-          >
-            <div
-              className={`message ${message.fromSelf ? "sended" : "recieved"}`}
-            >
-              <div className="content">
-                <p>{message.message}</p>
-              </div>
-            </div>
+      {/* Messages area */}
+      <main
+        className="flex-1 overflow-y-auto px-4 py-6 space-y-5 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent"
+      >
+        {isLoading ? (
+          <div className="flex h-full items-center justify-center text-gray-500">
+            Loading messages...
           </div>
-        ))}
-      </div>
+        ) : messages.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center text-center text-gray-500">
+            <p className="text-lg font-medium">No messages yet</p>
+            <p className="text-sm mt-2 opacity-80">Say something nice 👋</p>
+          </div>
+        ) : (
+          messages.map((msg, index) => {
+            const isLast = index === messages.length - 1;
+            const isSent = msg.fromSelf;
 
-      <ChatInput handleSendMsg={handleSendMsg} />
-    </Container>
+            return (
+              <div
+                key={msg._id || `${index}-${msg.message.slice(0, 10)}`}
+                ref={isLast ? scrollRef : null}
+                className={`flex ${isSent ? "justify-end" : "justify-start"} group`}
+              >
+                <div
+                  className={`
+                    max-w-[78%] px-4 py-3 rounded-2xl text-[15px] leading-relaxed
+                    shadow-sm transition-all duration-180
+                    ${isSent
+                      ? "bg-gradient-to-br from-indigo-600/90 to-purple-600/90 text-white rounded-br-none"
+                      : "bg-gray-800/70 backdrop-blur-sm border border-gray-700/50 text-gray-100 rounded-bl-none"
+                    }
+                    group-hover:shadow-md
+                  `}
+                >
+                  <p className="break-words">{msg.message}</p>
+
+                  {/* You can add time here later */}
+                  {/* <span className="text-xs opacity-60 mt-1.5 block text-right">
+                    {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                  </span> */}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </main>
+
+      {/* Input - floating pill style */}
+      <div className="p-4 pb-[env(safe-area-inset-bottom)] bg-transparent">
+        <div className="
+          bg-gray-900/70 backdrop-blur-2xl border border-gray-700/40
+          rounded-full px-4 py-3 flex items-center gap-3 shadow-2xl shadow-black/40
+        ">
+          <ChatInput handleSendMsg={handleSendMsg} />
+        </div>
+      </div>
+    </div>
   );
 }
-
-const Container = styled.div`
-  display: grid;
-  grid-template-rows: 10% 80% 10%;
-  gap: 0.1rem;
-  overflow: hidden;
-
-  @media screen and (min-width: 720px) and (max-width: 1080px) {
-    grid-template-rows: 15% 70% 15%;
-  }
-
-  .chat-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 2rem;
-
-    .user-details {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-
-      .avatar {
-        img {
-          height: 3rem;
-        }
-      }
-
-      .username {
-        h3 {
-          color: white;
-        }
-      }
-    }
-  }
-
-  .chat-messages {
-    padding: 1rem 2rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    overflow: auto;
-
-    &::-webkit-scrollbar {
-      width: 0.2rem;
-      &-thumb {
-        background-color: #ffffff39;
-        width: 0.1rem;
-        border-radius: 1rem;
-      }
-    }
-
-    .message {
-      display: flex;
-      align-items: center;
-
-      .content {
-        max-width: 40%;
-        overflow-wrap: break-word;
-        padding: 1rem;
-        font-size: 1.1rem;
-        border-radius: 1rem;
-        color: #d1d1d1;
-
-        @media screen and (min-width: 720px) and (max-width: 1080px) {
-          max-width: 70%;
-        }
-      }
-    }
-
-    .sended {
-      justify-content: flex-end;
-
-      .content {
-        background-color: #4f04ff21;
-      }
-    }
-
-    .recieved {
-      justify-content: flex-start;
-
-      .content {
-        background-color: #9900ff20;
-      }
-    }
-  }
-`;

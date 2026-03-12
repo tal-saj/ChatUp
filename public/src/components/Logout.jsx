@@ -1,7 +1,7 @@
+// Logout.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BiPowerOff } from "react-icons/bi";
-import styled from "styled-components";
+import { LogOut, Loader2 } from "lucide-react";
 import axios from "axios";
 import { logoutRoute } from "../utils/APIRoutes";
 
@@ -10,79 +10,69 @@ export default function Logout() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
-    if (isLoggingOut) return; // prevent double-click spam
+    if (isLoggingOut) return;
 
     setIsLoggingOut(true);
 
     try {
-      // Safely get user ID from localStorage
       const userData = JSON.parse(
         localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY) || "{}"
       );
 
+      // If no user → just clear and redirect (edge case)
       if (!userData?._id) {
-        console.warn("No user ID found in localStorage");
         localStorage.clear();
         navigate("/login");
         return;
       }
 
-      // Most logout endpoints expect POST (to invalidate token/session)
-      // If your backend really uses GET with /:id, change back to .get()
+      // POST is more correct for logout (session invalidation)
       const response = await axios.post(logoutRoute, {
-        userId: userData._id, // or just send nothing if backend uses auth token
+        userId: userData._id,
       });
 
-      // Check status or success field based on your backend response
+      // Adjust condition based on your actual backend response
       if (response.status === 200 || response.data?.success) {
         localStorage.clear();
         navigate("/login");
       } else {
-        console.error("Logout failed:", response.data);
-        // Optional: show toast "Logout failed, try again"
+        console.warn("Logout unsuccessful:", response.data);
+        // Optional: toast.error("Logout failed. Please try again.")
       }
     } catch (error) {
-      console.error("Logout error:", error.message || error);
-      // Optional: toast error message
+      console.error("Logout failed:", error);
+      // Optional: toast.error("Something went wrong. Please try again.")
     } finally {
       setIsLoggingOut(false);
     }
   };
 
   return (
-    <Button
+    <button
       onClick={handleLogout}
       disabled={isLoggingOut}
-      title="Log out"
       aria-label="Log out"
+      title="Log out"
+      className={`
+        relative flex h-10 w-10 items-center justify-center rounded-full
+        bg-gradient-to-br from-gray-800 to-gray-900
+        text-gray-300 hover:text-white
+        transition-all duration-200
+        hover:scale-110 hover:shadow-lg hover:shadow-purple-900/30
+        focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:ring-offset-2 focus:ring-offset-gray-950
+        disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none
+      `}
     >
-      <BiPowerOff />
-    </Button>
+      {isLoggingOut ? (
+        <Loader2 size={20} className="animate-spin" />
+      ) : (
+        <LogOut size={20} />
+      )}
+
+      {/* Optional micro pulse animation while logging out */}
+      {isLoggingOut && (
+        <span className="absolute inset-0 rounded-full bg-purple-600/20 animate-ping" />
+      )}
+    </button>
   );
 }
-
-const Button = styled.button`
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 0.5rem;
-  border-radius: 0.5rem;
-  background-color: #9a86f3;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:hover {
-    background-color: #7f6cd1;
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  svg {
-    font-size: 1.3rem;
-    color: #ebe7ff;
-  }
-`;

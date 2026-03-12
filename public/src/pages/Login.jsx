@@ -1,10 +1,10 @@
+// Login.jsx
 import React, { useState, useEffect } from "react";
-import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
-import styled from "styled-components";
-import Logo from "../assets/logo.svg";
+import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import Logo from "../assets/logo.svg";
 import { loginRoute } from "../utils/APIRoutes";
 
 export default function Login() {
@@ -27,52 +27,50 @@ export default function Login() {
     }
   }, [navigate]);
 
-  const handleChange = (event) => {
-    setValues({ ...values, [event.target.name]: event.target.value });
+  const handleChange = (e) => {
+    setValues({ ...values, [e.target.name]: e.target.value });
   };
 
   const validateForm = () => {
     const { username, password } = values;
 
     if (!username.trim()) {
-      toast.error("Username is required.", toastOptions);
+      toast.error("Username is required", toastOptions);
       return false;
     }
     if (!password.trim()) {
-      toast.error("Password is required.", toastOptions);
+      toast.error("Password is required", toastOptions);
       return false;
     }
     return true;
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     if (!validateForm()) return;
 
     setIsSubmitting(true);
 
     try {
-      const { username, password } = values;
       const { data } = await axios.post(loginRoute, {
-        username,
-        password,
+        username: values.username,
+        password: values.password,
       });
 
-      if (data.status === false) {
-        toast.error(data.msg || "Login failed. Please check your credentials.", toastOptions);
-      } else if (data.status === true) {
+      if (!data.status) {
+        toast.error(data.msg || "Invalid credentials", toastOptions);
+      } else {
         localStorage.setItem(
           process.env.REACT_APP_LOCALHOST_KEY,
           JSON.stringify(data.user)
         );
-        toast.success("Logged in successfully!", toastOptions);
+        toast.success("Welcome back!", toastOptions);
         navigate("/");
       }
     } catch (error) {
-      console.error("Login error:", error);
+      console.error("Login failed:", error);
       toast.error(
-        error.response?.data?.msg || "Something went wrong. Try again later.",
+        error.response?.data?.msg || "Something went wrong",
         toastOptions
       );
     } finally {
@@ -81,158 +79,118 @@ export default function Login() {
   };
 
   return (
-    <>
-      <FormContainer>
-        <form onSubmit={handleSubmit}>
-          <div className="brand">
-            <img src={Logo} alt="ChatUp logo" />
-            <h1>ChatUp</h1>
+    <div className="relative min-h-screen w-full flex items-center justify-center p-6 bg-gradient-to-br from-gray-950 via-indigo-950/60 to-purple-950/40 overflow-hidden">
+
+      {/* Optional subtle animated background elements */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute -left-40 -top-40 h-96 w-96 rounded-full bg-purple-600/10 blur-3xl animate-blob-slow" />
+        <div className="absolute -right-40 bottom-20 h-96 w-96 rounded-full bg-indigo-600/10 blur-3xl animate-blob animation-delay-3000" />
+      </div>
+
+      <div className="
+        relative z-10 w-full max-w-md
+        bg-gray-900/40 backdrop-blur-2xl border border-gray-700/50
+        rounded-3xl shadow-2xl shadow-black/60
+        p-8 md:p-10
+      ">
+
+        <form onSubmit={handleSubmit} className="flex flex-col items-center gap-8">
+
+          {/* Logo + Title */}
+          <div className="flex flex-col items-center gap-3 mb-4">
+            <img
+              src={Logo}
+              alt="ChatUp"
+              className="h-16 md:h-20 w-auto drop-shadow-lg"
+            />
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+              ChatUp
+            </h1>
           </div>
 
-          <input
-            type="text"
-            placeholder="Username"
-            name="username"
-            value={values.username}
-            onChange={handleChange}
-            minLength={3}
-            required
-            disabled={isSubmitting}
-            aria-label="Username"
-          />
+          {/* Username */}
+          <div className="w-full">
+            <input
+              type="text"
+              name="username"
+              placeholder="Username"
+              value={values.username}
+              onChange={handleChange}
+              minLength={3}
+              required
+              disabled={isSubmitting}
+              autoComplete="username"
+              className="
+                w-full px-5 py-4 rounded-xl
+                bg-gray-800/50 border border-gray-700/70
+                text-white placeholder-gray-500
+                focus:border-indigo-500/70 focus:bg-gray-800/70 focus:ring-2 focus:ring-indigo-500/30
+                outline-none transition-all duration-200
+                disabled:opacity-60 disabled:cursor-not-allowed
+              "
+            />
+          </div>
 
-          <input
-            type="password"
-            placeholder="Password"
-            name="password"
-            value={values.password}
-            onChange={handleChange}
-            required
-            disabled={isSubmitting}
-            aria-label="Password"
-          />
+          {/* Password */}
+          <div className="w-full">
+            <input
+              type="password"
+              name="password"
+              placeholder="Password"
+              value={values.password}
+              onChange={handleChange}
+              required
+              disabled={isSubmitting}
+              autoComplete="current-password"
+              className="
+                w-full px-5 py-4 rounded-xl
+                bg-gray-800/50 border border-gray-700/70
+                text-white placeholder-gray-500
+                focus:border-indigo-500/70 focus:bg-gray-800/70 focus:ring-2 focus:ring-indigo-500/30
+                outline-none transition-all duration-200
+                disabled:opacity-60 disabled:cursor-not-allowed
+              "
+            />
+          </div>
 
+          {/* Submit Button */}
           <button
             type="submit"
             disabled={isSubmitting}
-            aria-label="Log In"
+            className={`
+              w-full py-4 rounded-xl font-semibold text-lg tracking-wide
+              transition-all duration-300 transform
+              ${
+                !isSubmitting
+                  ? "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-700/40 hover:shadow-xl hover:shadow-indigo-700/50 hover:scale-[1.02] active:scale-95"
+                  : "bg-gray-700 text-gray-400 cursor-not-allowed opacity-70"
+              }
+            `}
           >
-            {isSubmitting ? "Logging in..." : "Log In"}
+            {isSubmitting ? (
+              <span className="flex items-center justify-center gap-3">
+                <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Logging in...
+              </span>
+            ) : (
+              "Log In"
+            )}
           </button>
 
-          <span>
-            Don't have an account? <Link to="/register">Create One.</Link>
-          </span>
+          {/* Register link */}
+          <p className="text-gray-400 text-sm mt-2">
+            Don't have an account?{" "}
+            <Link
+              to="/register"
+              className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
+            >
+              Sign up
+            </Link>
+          </p>
         </form>
-      </FormContainer>
+      </div>
 
       <ToastContainer />
-    </>
+    </div>
   );
 }
-
-const FormContainer = styled.div`
-  height: 100vh;
-  width: 100vw;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  background-color: #131324;
-  gap: 1rem;
-
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    justify-content: center;
-    margin-bottom: 1rem;
-
-    img {
-      height: 5rem;
-    }
-
-    h1 {
-      color: white;
-      text-transform: uppercase;
-      font-size: 2.5rem;
-    }
-  }
-
-  form {
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
-    background-color: #00000076;
-    border-radius: 2rem;
-    padding: 4rem 5rem;
-    width: 100%;
-    max-width: 450px;
-
-    @media screen and (max-width: 768px) {
-      padding: 3rem 2rem;
-    }
-  }
-
-  input {
-    background-color: transparent;
-    padding: 1rem;
-    border: 0.1rem solid #4e0eff;
-    border-radius: 0.4rem;
-    color: white;
-    width: 100%;
-    font-size: 1rem;
-
-    &:focus {
-      border-color: #997af0;
-      outline: none;
-      box-shadow: 0 0 0 3px rgba(153, 122, 240, 0.2);
-    }
-
-    &:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-  }
-
-  button {
-    background-color: #4e0eff;
-    color: white;
-    padding: 1rem 2rem;
-    border: none;
-    font-weight: bold;
-    cursor: pointer;
-    border-radius: 0.4rem;
-    font-size: 1.1rem;
-    text-transform: uppercase;
-    transition: all 0.3s ease;
-
-    &:hover:not(:disabled) {
-      background-color: #3d0cd1;
-      transform: translateY(-2px);
-    }
-
-    &:disabled {
-      background-color: #666;
-      cursor: not-allowed;
-      opacity: 0.7;
-    }
-  }
-
-  span {
-    color: white;
-    text-align: center;
-    text-transform: uppercase;
-    font-size: 0.9rem;
-
-    a {
-      color: #4e0eff;
-      text-decoration: none;
-      font-weight: bold;
-
-      &:hover {
-        text-decoration: underline;
-      }
-    }
-  }
-`;

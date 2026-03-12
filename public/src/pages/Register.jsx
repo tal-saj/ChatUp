@@ -1,10 +1,10 @@
+// Register.jsx
 import React, { useState, useEffect } from "react";
-import axios from "axios";
-import styled from "styled-components";
 import { useNavigate, Link } from "react-router-dom";
-import Logo from "../assets/logo.svg";
+import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import Logo from "../assets/logo.svg";
 import { registerRoute } from "../utils/APIRoutes";
 
 export default function Register() {
@@ -25,48 +25,45 @@ export default function Register() {
     theme: "dark",
   };
 
-  // Redirect if already logged in
   useEffect(() => {
     if (localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY)) {
       navigate("/");
     }
   }, [navigate]);
 
-  const handleChange = (event) => {
-    setValues({ ...values, [event.target.name]: event.target.value });
+  const handleChange = (e) => {
+    setValues({ ...values, [e.target.name]: e.target.value });
   };
 
   const handleValidation = () => {
     const { password, confirmPassword, username, email } = values;
 
     if (password !== confirmPassword) {
-      toast.error("Password and confirm password must match.", toastOptions);
+      toast.error("Passwords don't match", toastOptions);
       return false;
     }
     if (username.length < 3) {
-      toast.error("Username must be at least 3 characters.", toastOptions);
+      toast.error("Username must be at least 3 characters", toastOptions);
       return false;
     }
     if (password.length < 8) {
-      toast.error("Password must be at least 8 characters.", toastOptions);
+      toast.error("Password must be at least 8 characters", toastOptions);
       return false;
     }
     if (!email.trim()) {
-      toast.error("Email is required.", toastOptions);
+      toast.error("Email is required", toastOptions);
       return false;
     }
-    // Optional: basic email format check
     if (!/\S+@\S+\.\S+/.test(email)) {
-      toast.error("Please enter a valid email address.", toastOptions);
+      toast.error("Please enter a valid email", toastOptions);
       return false;
     }
 
     return true;
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     if (!handleValidation()) return;
 
     setIsSubmitting(true);
@@ -80,21 +77,20 @@ export default function Register() {
         password,
       });
 
-      if (data.status === false) {
-        toast.error(data.msg || "Registration failed. Try again.", toastOptions);
-      } else if (data.status === true) {
+      if (!data.status) {
+        toast.error(data.msg || "Registration failed", toastOptions);
+      } else {
         localStorage.setItem(
           process.env.REACT_APP_LOCALHOST_KEY,
           JSON.stringify(data.user)
         );
-        toast.success("Account created successfully!", toastOptions);
+        toast.success("Account created! Welcome 🎉", toastOptions);
         navigate("/");
       }
     } catch (error) {
       console.error("Registration error:", error);
       toast.error(
-        error.response?.data?.msg ||
-          "Something went wrong. Please try again later.",
+        error.response?.data?.msg || "Something went wrong",
         toastOptions
       );
     } finally {
@@ -103,184 +99,156 @@ export default function Register() {
   };
 
   return (
-    <>
-      <FormContainer>
-        <form onSubmit={handleSubmit}>
-          <div className="brand">
-            <img src={Logo} alt="ChatUp logo" />
-            <h1>ChatUp</h1>
+    <div className="relative min-h-screen w-full flex items-center justify-center p-6 bg-gradient-to-br from-gray-950 via-indigo-950/60 to-purple-950/40 overflow-hidden">
+
+      {/* Decorative background blobs */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute -left-40 -top-40 h-96 w-96 rounded-full bg-purple-600/10 blur-3xl animate-blob-slow" />
+        <div className="absolute -right-40 bottom-10 h-96 w-96 rounded-full bg-indigo-600/10 blur-3xl animate-blob animation-delay-4000" />
+      </div>
+
+      <div className="
+        relative z-10 w-full max-w-lg
+        bg-gray-900/40 backdrop-blur-2xl border border-gray-700/50
+        rounded-3xl shadow-2xl shadow-black/60
+        p-8 md:p-12
+      ">
+
+        <form onSubmit={handleSubmit} className="flex flex-col items-center gap-7">
+
+          {/* Logo + Title */}
+          <div className="flex flex-col items-center gap-3 mb-2">
+            <img
+              src={Logo}
+              alt="ChatUp"
+              className="h-16 md:h-20 w-auto drop-shadow-lg"
+            />
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+              ChatUp
+            </h1>
           </div>
 
+          {/* Username */}
           <input
             type="text"
-            placeholder="Username"
             name="username"
+            placeholder="Username"
             value={values.username}
             onChange={handleChange}
             minLength={3}
             required
             disabled={isSubmitting}
-            aria-label="Username"
+            autoComplete="username"
+            className="
+              w-full px-5 py-4 rounded-xl
+              bg-gray-800/50 border border-gray-700/70
+              text-white placeholder-gray-500
+              focus:border-indigo-500/70 focus:bg-gray-800/70 focus:ring-2 focus:ring-indigo-500/30
+              outline-none transition-all duration-200
+              disabled:opacity-60 disabled:cursor-not-allowed
+            "
           />
 
+          {/* Email */}
           <input
             type="email"
-            placeholder="Email"
             name="email"
+            placeholder="Email"
             value={values.email}
             onChange={handleChange}
             required
             disabled={isSubmitting}
-            aria-label="Email"
+            autoComplete="email"
+            className="
+              w-full px-5 py-4 rounded-xl
+              bg-gray-800/50 border border-gray-700/70
+              text-white placeholder-gray-500
+              focus:border-indigo-500/70 focus:bg-gray-800/70 focus:ring-2 focus:ring-indigo-500/30
+              outline-none transition-all duration-200
+              disabled:opacity-60 disabled:cursor-not-allowed
+            "
           />
 
+          {/* Password */}
           <input
             type="password"
-            placeholder="Password"
             name="password"
+            placeholder="Password"
             value={values.password}
             onChange={handleChange}
             minLength={8}
             required
             disabled={isSubmitting}
-            aria-label="Password"
+            autoComplete="new-password"
+            className="
+              w-full px-5 py-4 rounded-xl
+              bg-gray-800/50 border border-gray-700/70
+              text-white placeholder-gray-500
+              focus:border-indigo-500/70 focus:bg-gray-800/70 focus:ring-2 focus:ring-indigo-500/30
+              outline-none transition-all duration-200
+              disabled:opacity-60 disabled:cursor-not-allowed
+            "
           />
 
+          {/* Confirm Password */}
           <input
             type="password"
-            placeholder="Confirm Password"
             name="confirmPassword"
+            placeholder="Confirm Password"
             value={values.confirmPassword}
             onChange={handleChange}
             minLength={8}
             required
             disabled={isSubmitting}
-            aria-label="Confirm Password"
+            autoComplete="new-password"
+            className="
+              w-full px-5 py-4 rounded-xl
+              bg-gray-800/50 border border-gray-700/70
+              text-white placeholder-gray-500
+              focus:border-indigo-500/70 focus:bg-gray-800/70 focus:ring-2 focus:ring-indigo-500/30
+              outline-none transition-all duration-200
+              disabled:opacity-60 disabled:cursor-not-allowed
+            "
           />
 
+          {/* Submit Button */}
           <button
             type="submit"
             disabled={isSubmitting}
-            aria-label="Create account"
+            className={`
+              w-full py-4 rounded-xl font-semibold text-lg tracking-wide mt-2
+              transition-all duration-300 transform
+              ${
+                !isSubmitting
+                  ? "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-700/40 hover:shadow-xl hover:shadow-indigo-700/50 hover:scale-[1.02] active:scale-95"
+                  : "bg-gray-700 text-gray-400 cursor-not-allowed opacity-70"
+              }
+            `}
           >
-            {isSubmitting ? "Creating..." : "Create User"}
+            {isSubmitting ? (
+              <span className="flex items-center justify-center gap-3">
+                <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Creating account...
+              </span>
+            ) : (
+              "Create Account"
+            )}
           </button>
 
-          <span>
-            Already have an account? <Link to="/login">Login.</Link>
-          </span>
+          {/* Login link */}
+          <p className="text-gray-400 text-sm mt-3">
+            Already have an account?{" "}
+            <Link
+              to="/login"
+              className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
+            >
+              Sign in
+            </Link>
+          </p>
         </form>
-      </FormContainer>
+      </div>
 
       <ToastContainer />
-    </>
+    </div>
   );
 }
-
-const FormContainer = styled.div`
-  height: 100vh;
-  width: 100vw;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  background-color: #131324;
-  gap: 1rem;
-  padding: 1rem;
-
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    justify-content: center;
-    margin-bottom: 1.5rem;
-
-    img {
-      height: 5rem;
-    }
-
-    h1 {
-      color: white;
-      text-transform: uppercase;
-      font-size: 2.5rem;
-    }
-  }
-
-  form {
-    display: flex;
-    flex-direction: column;
-    gap: 1.8rem;
-    background-color: #00000076;
-    border-radius: 2rem;
-    padding: 3.5rem 5rem;
-    width: 100%;
-    max-width: 480px;
-
-    @media screen and (max-width: 768px) {
-      padding: 2.5rem 2rem;
-      gap: 1.5rem;
-    }
-  }
-
-  input {
-    background-color: transparent;
-    padding: 1rem 1.2rem;
-    border: 0.1rem solid #4e0eff;
-    border-radius: 0.5rem;
-    color: white;
-    font-size: 1rem;
-    width: 100%;
-
-    &:focus {
-      border-color: #997af0;
-      outline: none;
-      box-shadow: 0 0 0 3px rgba(153, 122, 240, 0.25);
-    }
-
-    &:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-  }
-
-  button {
-    background-color: #4e0eff;
-    color: white;
-    padding: 1rem 2.5rem;
-    border: none;
-    font-weight: bold;
-    cursor: pointer;
-    border-radius: 0.5rem;
-    font-size: 1.1rem;
-    text-transform: uppercase;
-    transition: all 0.3s ease;
-
-    &:hover:not(:disabled) {
-      background-color: #3d0cd1;
-      transform: translateY(-2px);
-    }
-
-    &:disabled {
-      background-color: #555;
-      cursor: not-allowed;
-      opacity: 0.7;
-    }
-  }
-
-  span {
-    color: white;
-    text-align: center;
-    font-size: 0.95rem;
-    text-transform: uppercase;
-
-    a {
-      color: #4e0eff;
-      text-decoration: none;
-      font-weight: bold;
-
-      &:hover {
-        text-decoration: underline;
-      }
-    }
-  }
-`;
