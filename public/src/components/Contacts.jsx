@@ -51,7 +51,7 @@ export default function Contacts({ contacts, changeChat }) {
 
   {/* Friends Page Link */}
   <button
-    onClick={() => window.location.href = "public\src\pages\FriendsPage.jsx"} // or use React Router's navigate
+    onClick={() => window.location.href = "/public/src/pages/FriendsPage.jsx"} // or use React Router's navigate
     className="absolute left-4 text-sm font-medium text-blue-600 hover:underline"
   >
     Friends
