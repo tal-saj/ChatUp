@@ -48,39 +48,52 @@ export default function FriendsPage() {
     return config;
   });
 
-  useEffect(() => {
-    // Redirect if not logged in
-    if (!user) {
-      navigate("/login");
-      return;
+useEffect(() => {
+  // Redirect if not logged in
+  if (!user) {
+    navigate("/login");
+    return;
+  }
+  
+  // Create api instance inside useEffect if only used here
+  const api = axios.create({
+    baseURL: process.env.REACT_APP_BACKEND_URL,
+    headers: {
+      Authorization: user?.token
     }
-    
-    const fetchData = async () => {
-      try {
-        setLoading(prev => ({ ...prev, page: true }));
-        setError(null);
-        
-        // Fetch both recommended users and requests in parallel
-        await Promise.all([
-          fetchRecommended(),
-          fetchRequests()
-        ]);
-      } catch (err) {
-        console.error("Failed to fetch data:", err);
-        setError("Failed to load friends data. Please try again.");
-        
-        // Handle unauthorized
-        if (err.response?.status === 401) {
-          localStorage.removeItem(process.env.REACT_APP_LOCALHOST_KEY);
-          navigate("/login");
-        }
-      } finally {
-        setLoading(prev => ({ ...prev, page: false }));
-      }
-    };
+  });
+  
+  // Define fetch functions
+  const fetchRecommended = async () => {
+    const { data } = await api.get(recommendedUsersRoute);
+    setRecommended(data);
+  };
 
-    fetchData();
-  }, []);
+  const fetchRequests = async () => {
+    const { data } = await api.get(friendRequestsRoute);
+    setRequests(data);
+  };
+  
+  const fetchData = async () => {
+    try {
+      setLoading(prev => ({ ...prev, page: true }));
+      await Promise.all([
+        fetchRecommended(),
+        fetchRequests()
+      ]);
+    } catch (err) {
+      console.error("Failed to fetch data:", err);
+      if (err.response?.status === 401) {
+        localStorage.removeItem(process.env.REACT_APP_LOCALHOST_KEY);
+        navigate("/login");
+      }
+    } finally {
+      setLoading(prev => ({ ...prev, page: false }));
+    }
+  };
+
+  fetchData();
+}, [user, navigate]); // Only user and navigate as dependencies
 
   const fetchRecommended = async () => {
     try {
