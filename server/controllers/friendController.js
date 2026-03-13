@@ -1,5 +1,5 @@
 // controllers/friendController.js
-const Users = require("../models/User");
+const Users = require("../models/userModel");
 const FriendRequest = require("../models/FriendRequest");
 
 exports.searchUsers = async (req, res) => {

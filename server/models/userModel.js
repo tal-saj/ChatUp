@@ -1,4 +1,3 @@
-// models/User.js
 const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema({
@@ -9,12 +8,14 @@ const userSchema = new mongoose.Schema({
     max: 20,
     unique: true,
   },
+
   email: {
     type: String,
     required: true,
     unique: true,
     max: 50,
   },
+
   password: {
     type: String,
     required: true,
@@ -31,8 +32,21 @@ const userSchema = new mongoose.Schema({
     default: "",
   },
 
-  // ⭐ NEW
   friends: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Users",
+    },
+  ],
+
+  friendRequests: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Users",
+    },
+  ],
+
+  sentRequests: [
     {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Users",
