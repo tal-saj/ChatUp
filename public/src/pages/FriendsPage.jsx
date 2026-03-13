@@ -77,6 +77,7 @@ useEffect(() => {
   const fetchData = async () => {
     try {
       setLoading(prev => ({ ...prev, page: true }));
+      setError(null);
       await Promise.all([
         fetchRecommended(),
         fetchRequests()
@@ -207,14 +208,14 @@ useEffect(() => {
   }
 
   // Error state
-  if (error) {
+   if (error) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <div className="text-center p-8 bg-red-50 rounded-lg">
+        <div className="text-center p-8 bg-red-50 rounded-lg max-w-md">
           <p className="text-red-600 mb-4">{error}</p>
           <button 
             onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
           >
             Retry
           </button>
