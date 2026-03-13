@@ -1,11 +1,12 @@
 // Contacts.jsx
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Logo from "../assets/logo.svg";
 import Logout from "./Logout";
-import { useNavigate } from "react-router-dom";
-const navigate = useNavigate();
+
 
 export default function Contacts({ contacts, changeChat }) {
+  const navigate = useNavigate();
   const [currentUserName, setCurrentUserName] = useState(undefined);
   const [currentUserImage, setCurrentUserImage] = useState(undefined);
   const [currentSelected, setCurrentSelected] = useState(undefined);
