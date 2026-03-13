@@ -90,7 +90,7 @@ app.get("/test-db", async (req, res) => {
 // ────────────────────────────────────────────────
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
-
+app.use("/api/friends", require("./routes/friends"));
 
 // ────────────────────────────────────────────────
 // Global error handler

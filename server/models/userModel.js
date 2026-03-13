@@ -1,3 +1,4 @@
+// models/User.js
 const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema({
@@ -19,14 +20,24 @@ const userSchema = new mongoose.Schema({
     required: true,
     min: 8,
   },
+
   isAvatarImageSet: {
     type: Boolean,
     default: false,
   },
+
   avatarImage: {
     type: String,
     default: "",
   },
+
+  // ⭐ NEW
+  friends: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Users",
+    },
+  ],
 });
 
 module.exports = mongoose.model("Users", userSchema);
