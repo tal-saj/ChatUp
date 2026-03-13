@@ -4,39 +4,30 @@ import SetAvatar from "./components/SetAvatar";
 import Chat from "./pages/Chat";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import FriendsPage from "./pages/FriendsPage";
 
 export default function App() {
+  const isLoggedIn = localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY);
+
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public routes - redirect to chat if already logged in */}
+        {/* Public routes */}
         <Route
           path="/login"
-          element={
-            localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY) ? (
-              <Navigate to="/" replace />
-            ) : (
-              <Login />
-            )
-          }
+          element={isLoggedIn ? <Navigate to="/" replace /> : <Login />}
         />
-
         <Route
           path="/register"
-          element={
-            localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY) ? (
-              <Navigate to="/" replace />
-            ) : (
-              <Register />
-            )
-          }
+          element={isLoggedIn ? <Navigate to="/" replace /> : <Register />}
         />
 
         {/* Protected-like routes */}
         <Route path="/setAvatar" element={<SetAvatar />} />
-        <Route path="/" element={<Chat />} />
+        <Route path="/" element={<Chat />} />          {/* Chat page (can render Contacts inside it) */}
+        <Route path="/friends" element={<FriendsPage />} />
 
-        {/* Optional: catch-all redirect to login or chat */}
+        {/* Catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
