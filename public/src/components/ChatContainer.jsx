@@ -1,7 +1,6 @@
 // ChatContainer.jsx
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
-import Logout from "./Logout";
 import axios from "axios";
 import { sendMessageRoute, recieveMessageRoute } from "../utils/APIRoutes";
 
@@ -131,7 +130,6 @@ export default function ChatContainer({ currentChat, socket }) {
           </div>
         </div>
 
-        <Logout />
       </header>
 
       {/* Messages area */}

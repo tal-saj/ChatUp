@@ -1,6 +1,7 @@
 // Contacts.jsx
 import React, { useState, useEffect } from "react";
 import Logo from "../assets/logo.svg";
+import Logout from "./Logout";
 
 export default function Contacts({ contacts, changeChat }) {
   const [currentUserName, setCurrentUserName] = useState(undefined);
@@ -128,31 +129,39 @@ export default function Contacts({ contacts, changeChat }) {
       </div>
 
       {/* Current user – bottom fixed bar */}
-      <div className="
-        shrink-0 border-t border-slate-200/70
-        bg-white/70 backdrop-blur-xl px-4 py-4
-        flex items-center gap-3.5 shadow-sm
-      ">
-        <div className="relative flex-shrink-0">
-          <div className="
-            h-12 w-12 rounded-full overflow-hidden 
-            ring-2 ring-slate-400/50 ring-offset-2 ring-offset-white
-            shadow-sm
-          ">
-            <img
-              src={`data:image/svg+xml;base64,${currentUserImage}`}
-              alt="Your avatar"
-              className="h-full w-full object-cover"
-            />
-          </div>
-        </div>
+<div className="
+  shrink-0 border-t border-slate-200/70
+  bg-white/70 backdrop-blur-xl px-4 py-4
+  flex items-center gap-3.5 shadow-sm
+">
 
-        <div className="min-w-0 flex-1">
-          <h2 className="font-semibold text-slate-900 truncate">
-            {currentUserName}
-          </h2>
-          <p className="text-xs text-slate-500 font-medium">You</p>
-        </div>
+  <div className="relative flex-shrink-0">
+    <div className="
+      h-12 w-12 rounded-full overflow-hidden 
+      ring-2 ring-slate-400/50 ring-offset-2 ring-offset-white
+      shadow-sm
+    ">
+      <img
+        src={`data:image/svg+xml;base64,${currentUserImage}`}
+        alt="Your avatar"
+        className="h-full w-full object-cover"
+      />
+    </div>
+  </div>
+
+  <div className="min-w-0 flex-1">
+    <h2 className="font-semibold text-slate-900 truncate">
+      {currentUserName}
+    </h2>
+    <p className="text-xs text-slate-500 font-medium">You</p>
+  </div>
+
+  {/* Logout Button */}
+  <div className="flex-shrink-0">
+    <Logout />
+  </div>
+
+
 
         {/* Optional: settings icon or more actions */}
         {/* <button className="ml-auto p-2.5 rounded-full hover:bg-slate-100 transition-colors">
