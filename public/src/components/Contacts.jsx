@@ -42,21 +42,30 @@ export default function Contacts({ contacts, changeChat }) {
   return (
     <div className="flex h-full flex-col bg-gradient-to-b from-slate-50 via-slate-100 to-white">
 
-      {/* Logo / Brand header */}
-      <div className="
-        shrink-0 flex items-center justify-center gap-3 py-5 px-4
-        border-b border-slate-200/70 bg-white/60 backdrop-blur-xl
-        shadow-sm
-      ">
-        <img 
-          src={Logo} 
-          alt="ChatUp" 
-          className="h-8 w-auto drop-shadow-sm transition-transform hover:scale-105" 
-        />
-        <h3 className="text-xl font-bold tracking-tight text-slate-800">
-          ChatUp
-        </h3>
-      </div>
+    {/* Logo / Brand header */}
+<div className="
+  shrink-0 flex items-center justify-center gap-3 py-5 px-4
+  border-b border-slate-200/70 bg-white/60 backdrop-blur-xl
+  shadow-sm
+">
+
+  {/* Friends Page Link */}
+  <button
+    onClick={() => window.location.href = "public\src\pages\FriendsPage.jsx"} // or use React Router's navigate
+    className="absolute left-4 text-sm font-medium text-blue-600 hover:underline"
+  >
+    Friends
+  </button>
+
+  <img 
+    src={Logo} 
+    alt="ChatUp" 
+    className="h-8 w-auto drop-shadow-sm transition-transform hover:scale-105" 
+  />
+  <h3 className="text-xl font-bold tracking-tight text-slate-800">
+    ChatUp
+  </h3>
+</div>
 
       {/* Contacts list */}
       <div className="
