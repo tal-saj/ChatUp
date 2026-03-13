@@ -8,6 +8,7 @@ const connectDB = require("./lib/connectDB");
 
 const authRoutes = require("./routes/auth");
 const messageRoutes = require("./routes/messages");
+const friendsRoutes = require("./routes/friends");
 
 require("dotenv").config();
 
@@ -84,13 +85,30 @@ app.get("/test-db", async (req, res) => {
   }
 });
 
+app.get("/", (req, res) => {
+  res.json({
+    message: "Chat App API",
+    version: "1.0.0",
+    status: "online",
+    database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+    endpoints: {
+      debug: "/debug",
+      testDb: "/test-db",
+      auth: "/api/auth",
+      messages: "/api/messages",
+      friends: "/api/friends"
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
 
 // ────────────────────────────────────────────────
 // Routes
 // ────────────────────────────────────────────────
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
-app.use("/api/friends", require("./routes/friends"));
+app.use("/api/friends", friendsRoutes);
 
 // ────────────────────────────────────────────────
 // Global error handler
