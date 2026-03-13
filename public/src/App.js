@@ -10,26 +10,15 @@ export default function App() {
   const isLoggedIn = localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY);
 
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Public routes */}
-        <Route
-          path="/login"
-          element={isLoggedIn ? <Navigate to="/" replace /> : <Login />}
-        />
-        <Route
-          path="/register"
-          element={isLoggedIn ? <Navigate to="/" replace /> : <Register />}
-        />
-
-        {/* Protected-like routes */}
-        <Route path="/setAvatar" element={<SetAvatar />} />
-        <Route path="/" element={<Chat />} />          {/* Chat page (can render Contacts inside it) */}
-        <Route path="/friends" element={<FriendsPage />} />
-
-        {/* Catch-all */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+   <BrowserRouter>
+  <Routes>
+    <Route path="/login" element={isLoggedIn ? <Navigate to="/" replace /> : <Login />} />
+    <Route path="/register" element={isLoggedIn ? <Navigate to="/" replace /> : <Register />} />
+    <Route path="/setAvatar" element={<SetAvatar />} />
+    <Route path="/" element={<Chat />} />
+    <Route path="/friends" element={<FriendsPage />} />
+    <Route path="*" element={<Navigate to="/" replace />} />
+  </Routes>
+</BrowserRouter>
   );
 }

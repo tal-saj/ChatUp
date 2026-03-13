@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from "react";
 import Logo from "../assets/logo.svg";
 import Logout from "./Logout";
+import { useNavigate } from "react-router-dom";
+const navigate = useNavigate();
 
 export default function Contacts({ contacts, changeChat }) {
   const [currentUserName, setCurrentUserName] = useState(undefined);
@@ -51,7 +53,7 @@ export default function Contacts({ contacts, changeChat }) {
 
   {/* Friends Page Link */}
   <button
-    onClick={() => window.location.href = "/friends"} // or use React Router's navigate
+   onClick={() => navigate("/friends")}
     className="absolute left-4 text-sm font-medium text-blue-600 hover:underline"
   >
     Friends
