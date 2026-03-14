@@ -7,6 +7,7 @@ import Logout from "./Logout";
 
 export default function Contacts({ contacts, changeChat }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [currentUserName, setCurrentUserName] = useState(undefined);
   const [currentUserImage, setCurrentUserImage] = useState(undefined);
   const [currentSelected, setCurrentSelected] = useState(undefined);
