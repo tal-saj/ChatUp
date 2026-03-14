@@ -14,6 +14,7 @@ import {
 } from "../utils/APIRoutes";
 
 export default function FriendsPage() {
+  
   const [search, setSearch] = useState("");
   const [recommended, setRecommended] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
@@ -29,8 +30,20 @@ export default function FriendsPage() {
   const navigate = useNavigate();
 
   // Get user from localStorage
-  const user = JSON.parse(localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY));
+useEffect(() => {
+  const user = JSON.parse(
+    localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY)
+  );
 
+  if (!user) {
+    navigate("/login");
+    return;
+  }
+
+  fetchData(user);
+}, []);
+
+  
   // Create axios instance with auth header
   const api = axios.create({
     baseURL: process.env.REACT_APP_BACKEND_URL,
@@ -74,24 +87,23 @@ useEffect(() => {
     setRequests(data);
   };
   
-  const fetchData = async () => {
-    try {
-      setLoading(prev => ({ ...prev, page: true }));
-      setError(null);
-      await Promise.all([
-        fetchRecommended(),
-        fetchRequests()
-      ]);
-    } catch (err) {
-      console.error("Failed to fetch data:", err);
-      if (err.response?.status === 401) {
-        localStorage.removeItem(process.env.REACT_APP_LOCALHOST_KEY);
-        navigate("/login");
-      }
-    } finally {
-      setLoading(prev => ({ ...prev, page: false }));
+const fetchData = async (user) => {
+  try {
+    const { data: recommendedData } = await api.get(recommendedUsersRoute);
+    const { data: requestData } = await api.get(friendRequestsRoute);
+
+    setRecommended(recommendedData);
+    setRequests(requestData);
+
+  } catch (err) {
+    console.error(err);
+
+    if (err.response?.status === 401) {
+      localStorage.removeItem(process.env.REACT_APP_LOCALHOST_KEY);
+      navigate("/login");
     }
-  };
+  }
+};
 
   fetchData();
 }, [user, navigate]); // Only user and navigate as dependencies
