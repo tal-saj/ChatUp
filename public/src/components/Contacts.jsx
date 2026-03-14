@@ -52,13 +52,21 @@ export default function Contacts({ contacts, changeChat }) {
   shadow-sm
 ">
 
-  {/* Friends Page Link */}
-  <button
-   onClick={() => navigate("/friends")}
-    className="absolute left-4 text-sm font-medium text-blue-600 hover:underline"
-  >
-    Friends
-  </button>
+{/* Friends Page Link */}
+<button
+  onClick={() => {
+    if (location.pathname !== "/friends") {
+      // Navigate to /friends if not already there
+      navigate("/friends");
+    } else {
+      // Already on /friends, force reload
+      navigate("/friends?refresh=" + Date.now());
+    }
+  }}
+  className="absolute left-4 text-sm font-medium text-blue-600 hover:underline"
+>
+  Friends
+</button>
 
   <img 
     src={Logo} 
