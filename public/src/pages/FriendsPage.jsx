@@ -29,102 +29,102 @@ export default function FriendsPage() {
   
   const navigate = useNavigate();
 
-  // Get user from localStorage
-useEffect(() => {
-  const user = JSON.parse(
-    localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY)
-  );
+  // ─── Single axios instance + dynamic token via interceptor ────
+  const api = React.useMemo(() => {
+    const instance = axios.create({
+      baseURL: process.env.REACT_APP_BACKEND_URL,
+    });
 
-  if (!user) {
-    navigate("/login");
-    return;
-  }
+    instance.interceptors.request.use((config) => {
+      const stored = localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY);
+      let token = null;
 
-  fetchData(user);
-}, []);
+      try {
+        const user = stored ? JSON.parse(stored) : null;
+        token = user?.token;
+      } catch (e) {
+        console.warn("Failed to parse stored user", e);
+      }
 
-  
-  // Create axios instance with auth header
-  const api = axios.create({
-    baseURL: process.env.REACT_APP_BACKEND_URL,
-    headers: {
-      Authorization: user?.token // Make sure your token is stored here
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      } else {
+        delete config.headers.Authorization;
+      }
+
+      return config;
+    });
+
+    // Optional: catch 401 globally and redirect
+    instance.interceptors.response.use(
+      response => response,
+      error => {
+        if (error.response?.status === 401) {
+          localStorage.removeItem(process.env.REACT_APP_LOCALHOST_KEY);
+          navigate("/login", { replace: true });
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return instance;
+  }, [navigate]);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY);
+    
+    let user = null;
+    try {
+      user = stored ? JSON.parse(stored) : null;
+    } catch {}
+
+    // Stricter check: require token
+    if (!user?.token) {
+      navigate("/login", { replace: true });
+      return;
     }
-  });
 
-  // Add token to requests if not in the instance
-  api.interceptors.request.use((config) => {
-    const user = JSON.parse(localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY));
-    if (user?.token) {
-      config.headers.Authorization = user.token;
-    }
-    return config;
-  });
+    const fetchData = async () => {
+      try {
+        setLoading(prev => ({ ...prev, page: true }));
+        setError(null);
 
-useEffect(() => {
-  // Redirect if not logged in
-  if (!user) {
-    navigate("/login");
-    return;
-  }
-  
-  // Create api instance inside useEffect if only used here
-  const api = axios.create({
-    baseURL: process.env.REACT_APP_BACKEND_URL,
-    headers: {
-      Authorization: user?.token
-    }
-  });
-  
-  // Define fetch functions
-  const fetchRecommended = async () => {
-    const { data } = await api.get(recommendedUsersRoute);
-    setRecommended(data);
-  };
+        const [recommendedRes, requestsRes] = await Promise.all([
+          api.get(recommendedUsersRoute),
+          api.get(friendRequestsRoute),
+        ]);
 
-  const fetchRequests = async () => {
-    const { data } = await api.get(friendRequestsRoute);
-    setRequests(data);
-  };
-  
-const fetchData = async (user) => {
-  try {
-    const { data: recommendedData } = await api.get(recommendedUsersRoute);
-    const { data: requestData } = await api.get(friendRequestsRoute);
+        setRecommended(recommendedRes.data ?? []);
+        setRequests(requestsRes.data ?? []);
 
-    setRecommended(recommendedData);
-    setRequests(requestData);
+      } catch (err) {
+        console.error("Failed to fetch initial data:", err);
+        if (err.response?.status !== 401) {   // 401 already handled by interceptor
+          setError("Failed to load friends data. Please try again later.");
+        }
+      } finally {
+        setLoading(prev => ({ ...prev, page: false }));
+      }
+    };
 
-  } catch (err) {
-    console.error(err);
-
-    if (err.response?.status === 401) {
-      localStorage.removeItem(process.env.REACT_APP_LOCALHOST_KEY);
-      navigate("/login");
-    }
-  }
-};
-
-  fetchData();
-}, [user, navigate]); // Only user and navigate as dependencies
+    fetchData();
+  }, [api, navigate]); // api is stable → runs once (unless forced remount)
 
   const fetchRecommended = async () => {
     try {
       const { data } = await api.get(recommendedUsersRoute);
-      setRecommended(data);
+      setRecommended(data ?? []);
     } catch (err) {
-      console.error("Error fetching recommended:", err);
-      throw err; // Re-throw to be caught by Promise.all
+      console.error("Error refreshing recommendations:", err);
     }
   };
 
   const fetchRequests = async () => {
     try {
       const { data } = await api.get(friendRequestsRoute);
-      setRequests(data);
+      setRequests(data ?? []);
     } catch (err) {
-      console.error("Error fetching requests:", err);
-      throw err;
+      console.error("Error refreshing requests:", err);
     }
   };
 
@@ -139,12 +139,11 @@ const fetchData = async (user) => {
     setLoading(prev => ({ ...prev, search: true }));
     
     try {
-      // FIXED: Changed from /api/users/search to /api/friends/search
-      const { data } = await api.get(`${searchUsersRoute}?username=${value}`);
-      setSearchResults(data);
+      const { data } = await api.get(`${searchUsersRoute}?username=${encodeURIComponent(value)}`);
+      setSearchResults(data ?? []);
     } catch (err) {
       console.error("Search error:", err);
-      // Show error toast or message
+      setSearchResults([]);
     } finally {
       setLoading(prev => ({ ...prev, search: false }));
     }
@@ -156,15 +155,13 @@ const fetchData = async (user) => {
     try {
       await api.post(sendFriendRequestRoute, { userId });
       alert("Friend request sent successfully!");
-      
-      // Refresh recommended list after sending request
-      fetchRecommended();
+      fetchRecommended();           // refresh suggestions
     } catch (err) {
       console.error("Failed to send request:", err);
-      
-      if (err.response?.status === 409) {
+      const status = err.response?.status;
+      if (status === 409) {
         alert("Friend request already sent or user is already a friend");
-      } else if (err.response?.status === 400) {
+      } else if (status === 400) {
         alert("Cannot send friend request to yourself");
       } else {
         alert("Failed to send friend request. Please try again.");
@@ -179,14 +176,9 @@ const fetchData = async (user) => {
     
     try {
       await api.post(acceptFriendRequestRoute, { requestId });
-      
-      // Refresh requests list
-      await fetchRequests();
-      
-      // Optionally refresh recommended list
-      fetchRecommended();
-      
       alert("Friend request accepted!");
+      fetchRequests();
+      fetchRecommended();           // might affect recommendations
     } catch (err) {
       console.error("Failed to accept request:", err);
       alert("Failed to accept request. Please try again.");
@@ -198,8 +190,6 @@ const fetchData = async (user) => {
   const rejectRequest = async (requestId) => {
     try {
       await api.post(rejectFriendRequestRoute, { requestId });
-      
-      // Refresh requests list
       fetchRequests();
     } catch (err) {
       console.error("Failed to reject request:", err);
@@ -207,7 +197,8 @@ const fetchData = async (user) => {
     }
   };
 
-  // Loading state
+  // ─── Rendering ───────────────────────────────────────
+
   if (loading.page) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -219,8 +210,7 @@ const fetchData = async (user) => {
     );
   }
 
-  // Error state
-   if (error) {
+  if (error) {
     return (
       <div className="flex justify-center items-center h-screen">
         <div className="text-center p-8 bg-red-50 rounded-lg max-w-md">
