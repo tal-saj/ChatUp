@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { io } from "socket.io-client";
+
 import { allUsersRoute, host } from "../utils/APIRoutes";
 import ChatContainer from "../components/ChatContainer";
 import Contacts from "../components/Contacts";
@@ -39,26 +39,7 @@ export default function Chat() {
     }
   }, [navigate]);
 
-  // ─── 2. Socket connection ───
-  useEffect(() => {
-    if (!currentUser?._id) return;
-
-    socket.current = io(host, {
-      withCredentials: true,
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-    });
-
-    socket.current.emit("add-user", currentUser._id);
-
-    return () => {
-      if (socket.current) {
-        socket.current.disconnect();
-        socket.current = null;
-      }
-    };
-  }, [currentUser?._id]);
+ 
 
   // ─── 3. Fetch contacts ───
   useEffect(() => {
