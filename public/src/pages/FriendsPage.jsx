@@ -1,8 +1,9 @@
+// FriendsPage.jsx
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
-// Import API routes
+// Import API routes (make sure this path is correct)
 import { 
   searchUsersRoute,
   recommendedUsersRoute, 
@@ -11,8 +12,6 @@ import {
   acceptFriendRequestRoute,
   rejectFriendRequestRoute 
 } from "../utils/APIRoutes";
-
-import Navigation from "../components/Navigation";
 
 export default function FriendsPage() {
   
@@ -100,7 +99,7 @@ export default function FriendsPage() {
 
       } catch (err) {
         console.error("Failed to fetch initial data:", err);
-        if (err.response?.status !== 401) {
+        if (err.response?.status !== 401) {   // 401 already handled by interceptor
           setError("Failed to load friends data. Please try again later.");
         }
       } finally {
@@ -109,7 +108,7 @@ export default function FriendsPage() {
     };
 
     fetchData();
-  }, [api, navigate]);
+  }, [api, navigate]); // api is stable → runs once (unless forced remount)
 
   const fetchRecommended = async () => {
     try {
@@ -156,7 +155,7 @@ export default function FriendsPage() {
     try {
       await api.post(sendFriendRequestRoute, { userId });
       alert("Friend request sent successfully!");
-      fetchRecommended(); // refresh suggestions
+      fetchRecommended();           // refresh suggestions
     } catch (err) {
       console.error("Failed to send request:", err);
       const status = err.response?.status;
@@ -179,7 +178,7 @@ export default function FriendsPage() {
       await api.post(acceptFriendRequestRoute, { requestId });
       alert("Friend request accepted!");
       fetchRequests();
-      fetchRecommended(); // might affect recommendations
+      fetchRecommended();           // might affect recommendations
     } catch (err) {
       console.error("Failed to accept request:", err);
       alert("Failed to accept request. Please try again.");
@@ -202,182 +201,179 @@ export default function FriendsPage() {
 
   if (loading.page) {
     return (
-      <>
-        <Navigation />
-        <div className="flex justify-center items-center h-screen pt-16">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading friends data...</p>
-          </div>
+      <div className="flex justify-center items-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading friends data...</p>
         </div>
-      </>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <>
-        <Navigation />
-        <div className="flex justify-center items-center h-screen pt-16">
-          <div className="text-center p-8 bg-red-50 rounded-lg max-w-md">
-            <p className="text-red-600 mb-4">{error}</p>
-            <button 
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-            >
-              Retry
-            </button>
-          </div>
+      <div className="flex justify-center items-center h-screen">
+        <div className="text-center p-8 bg-red-50 rounded-lg max-w-md">
+          <p className="text-red-600 mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+          >
+            Retry
+          </button>
         </div>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
-      <Navigation />
-      <div className="pt-16 min-h-screen bg-gradient-to-br from-slate-100 via-slate-50 to-white">
-        <div className="p-6 space-y-8 max-w-4xl mx-auto">
+    <div className="p-6 space-y-8 max-w-4xl mx-auto">
+      
+      {/* Back to Chat Button */}
+      <button
+        onClick={() => navigate("/")}
+        className="mb-4 px-4 py-2 text-blue-600 hover:text-blue-800 font-medium flex items-center gap-2"
+      >
+        ← Back to Chat
+      </button>
+
+      {/* Search Users */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-xl font-bold mb-4">Search Users</h2>
+
+        <input
+          type="text"
+          placeholder="Search by username..."
+          value={search}
+          onChange={(e) => searchUsers(e.target.value)}
+          className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+        />
+
+        {loading.search && (
+          <div className="mt-4 text-center text-gray-500">Searching...</div>
+        )}
+
+        <div className="mt-4 space-y-2">
+          {searchResults.length === 0 && search.trim() !== "" && !loading.search && (
+            <p className="text-gray-500 text-center py-4">No users found</p>
+          )}
           
-          {/* Search Users */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold mb-4">🔍 Search Users</h2>
+          {searchResults.map((user) => (
+            <div
+              key={user._id}
+              className="flex justify-between items-center p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                {user.avatarImage && (
+                  <img 
+                    src={`data:image/svg+xml;base64,${user.avatarImage}`}
+                    alt={user.username}
+                    className="w-10 h-10 rounded-full"
+                  />
+                )}
+                <span className="font-medium">{user.username}</span>
+              </div>
 
-            <input
-              type="text"
-              placeholder="Search by username..."
-              value={search}
-              onChange={(e) => searchUsers(e.target.value)}
-              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            />
-
-            {loading.search && (
-              <div className="mt-4 text-center text-gray-500">Searching...</div>
-            )}
-
-            <div className="mt-4 space-y-2">
-              {searchResults.length === 0 && search.trim() !== "" && !loading.search && (
-                <p className="text-gray-500 text-center py-4">No users found</p>
-              )}
-              
-              {searchResults.map((user) => (
-                <div
-                  key={user._id}
-                  className="flex justify-between items-center p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    {user.avatarImage && (
-                      <img 
-                        src={`data:image/svg+xml;base64,${user.avatarImage}`}
-                        alt={user.username}
-                        className="w-10 h-10 rounded-full"
-                      />
-                    )}
-                    <span className="font-medium">{user.username}</span>
-                  </div>
-
-                  <button
-                    onClick={() => sendRequest(user._id)}
-                    disabled={loading.sendRequest}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {loading.sendRequest ? "Sending..." : "Add Friend"}
-                  </button>
-                </div>
-              ))}
+              <button
+                onClick={() => sendRequest(user._id)}
+                disabled={loading.sendRequest}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
+              >
+                {loading.sendRequest ? "Sending..." : "Add Friend"}
+              </button>
             </div>
-          </div>
-
-          {/* Recommended Friends */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold mb-4">🌟 Recommended Friends</h2>
-
-            {recommended.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No recommendations available</p>
-            ) : (
-              <div className="space-y-2">
-                {recommended.map((user) => (
-                  <div
-                    key={user._id}
-                    className="flex justify-between items-center p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      {user.avatarImage && (
-                        <img 
-                          src={`data:image/svg+xml;base64,${user.avatarImage}`}
-                          alt={user.username}
-                          className="w-10 h-10 rounded-full"
-                        />
-                      )}
-                      <span className="font-medium">{user.username}</span>
-                    </div>
-
-                    <button
-                      onClick={() => sendRequest(user._id)}
-                      disabled={loading.sendRequest}
-                      className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {loading.sendRequest ? "Sending..." : "Add"}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Friend Requests */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold mb-4">📨 Friend Requests</h2>
-
-            {requests.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No pending friend requests</p>
-            ) : (
-              <div className="space-y-2">
-                {requests.map((req) => (
-                  <div
-                    key={req._id}
-                    className="flex justify-between items-center p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      {req.from?.avatarImage && (
-                        <img 
-                          src={`data:image/svg+xml;base64,${req.from.avatarImage}`}
-                          alt={req.from.username}
-                          className="w-10 h-10 rounded-full"
-                        />
-                      )}
-                      <div>
-                        <span className="font-medium block">{req.from?.username}</span>
-                        <span className="text-xs text-gray-500">
-                          {new Date(req.createdAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => acceptRequest(req._id)}
-                        disabled={loading.acceptRequest}
-                        className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed transition-colors"
-                      >
-                        {loading.acceptRequest ? "Accepting..." : "Accept"}
-                      </button>
-                      
-                      <button
-                        onClick={() => rejectRequest(req._id)}
-                        className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
+          ))}
         </div>
       </div>
-    </>
+
+      {/* Recommended Friends */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-xl font-bold mb-4">Recommended Friends</h2>
+
+        {recommended.length === 0 ? (
+          <p className="text-gray-500 text-center py-8">No recommendations available</p>
+        ) : (
+          <div className="space-y-2">
+            {recommended.map((user) => (
+              <div
+                key={user._id}
+                className="flex justify-between items-center p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  {user.avatarImage && (
+                    <img 
+                      src={`data:image/svg+xml;base64,${user.avatarImage}`}
+                      alt={user.username}
+                      className="w-10 h-10 rounded-full"
+                    />
+                  )}
+                  <span className="font-medium">{user.username}</span>
+                </div>
+
+                <button
+                  onClick={() => sendRequest(user._id)}
+                  disabled={loading.sendRequest}
+                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed transition-colors"
+                >
+                  {loading.sendRequest ? "Sending..." : "Add"}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Friend Requests */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-xl font-bold mb-4">Friend Requests</h2>
+
+        {requests.length === 0 ? (
+          <p className="text-gray-500 text-center py-8">No pending friend requests</p>
+        ) : (
+          <div className="space-y-2">
+            {requests.map((req) => (
+              <div
+                key={req._id}
+                className="flex justify-between items-center p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  {req.from?.avatarImage && (
+                    <img 
+                      src={`data:image/svg+xml;base64,${req.from.avatarImage}`}
+                      alt={req.from.username}
+                      className="w-10 h-10 rounded-full"
+                    />
+                  )}
+                  <div>
+                    <span className="font-medium block">{req.from?.username}</span>
+                    <span className="text-xs text-gray-500">
+                      {new Date(req.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => acceptRequest(req._id)}
+                    disabled={loading.acceptRequest}
+                    className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {loading.acceptRequest ? "Accepting..." : "Accept"}
+                  </button>
+                  
+                  <button
+                    onClick={() => rejectRequest(req._id)}
+                    className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+    </div>
   );
 }
