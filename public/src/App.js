@@ -23,9 +23,9 @@ export default function App() {
           </ProtectedRoute>
         } />
         <Route path="/friends" element={
-          <ProtectedRoute>
+         
             <FriendsPage />
-          </ProtectedRoute>
+         
         } />
         
         <Route path="*" element={<Navigate to="/" replace />} />
