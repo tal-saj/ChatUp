@@ -40,22 +40,7 @@ export default function ChatContainer({ currentChat, socket }) {
     fetchMessages();
   }, [currentChat?._id, currentUser?._id]);
 
-  // Listen for incoming messages via socket
-  useEffect(() => {
-    if (!socket?.current) return;
-
-    const currentSocket = socket.current;
-
-    const handleReceive = (msg) => {
-      setArrivalMessage({ fromSelf: false, message: msg });
-    };
-
-    currentSocket.on("msg-recieve", handleReceive);
-
-    return () => {
-      currentSocket.off("msg-recieve", handleReceive);
-    };
-  }, [socket]);
+  
 
   // Append new incoming message
   useEffect(() => {
@@ -81,12 +66,7 @@ export default function ChatContainer({ currentChat, socket }) {
     setMessages((prev) => [...prev, optimisticMsg]);
 
     try {
-      socket.current.emit("send-msg", {
-        to: currentChat._id,
-        from: currentUser._id,
-        msg,
-      });
-
+     
       await axios.post(sendMessageRoute, {
         from: currentUser._id,
         to: currentChat._id,
