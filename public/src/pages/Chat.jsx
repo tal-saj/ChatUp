@@ -1,4 +1,3 @@
-// Chat.jsx
 import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -16,7 +15,7 @@ export default function Chat() {
   const [currentUser, setCurrentUser] = useState(undefined);
   const [isLoading, setIsLoading] = useState(true);
 
-  // ─── 1. Load current user + protect route ───
+  // ─── 1. Unified Auth & User Loading ───
   useEffect(() => {
     const userData = localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY);
 
@@ -63,11 +62,11 @@ export default function Chat() {
 
   // ─── 3. Fetch contacts ───
   useEffect(() => {
+    // Only fetch if we have a user and we are actually on this page
     if (!currentUser) return;
 
     const fetchUsers = async () => {
       setIsLoading(true);
-
       try {
         if (!currentUser.isAvatarImageSet) {
           navigate("/setAvatar");
@@ -90,10 +89,10 @@ export default function Chat() {
     setCurrentChat(chat);
   };
 
-  // ─── Loading overlay ───
-  if (isLoading || !currentUser) {
+  // ─── Loading overlay (Changed to h-full to stay within route bounds) ───
+  if (isLoading && !currentUser) {
     return (
-      <div className="fixed inset-0 bg-slate-50 flex items-center justify-center">
+      <div className="h-screen w-full bg-slate-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-5 animate-pulse">
           <div className="h-14 w-14 rounded-full border-4 border-slate-300 border-t-indigo-500/70 animate-spin" />
           <p className="text-slate-500 font-medium tracking-wide">Preparing your messages...</p>
@@ -103,14 +102,15 @@ export default function Chat() {
   }
 
   return (
-    <div className="relative flex h-screen w-screen overflow-hidden bg-gradient-to-br from-slate-100 via-slate-50 to-white">
+    // Changed 'w-screen' and 'fixed' logic to ensure the component stays 
+    // contained within its route and doesn't overlap the FriendsPage.
+    <div className="relative flex h-screen w-full overflow-hidden bg-gradient-to-br from-slate-100 via-slate-50 to-white">
 
-      {/* Centered container with soft shadow & very light border */}
       <div
         className="
           relative flex w-full max-w-[1800px] mx-auto h-full
-          shadow-2xl shadow-slate-300/40 rounded-2xl overflow-hidden
-          border border-slate-200/70 bg-white/60 backdrop-blur-xl
+          shadow-2xl shadow-slate-300/40 overflow-hidden
+          border-x border-slate-200/70 bg-white/60 backdrop-blur-xl
           transition-all duration-500
         "
       >
@@ -118,56 +118,44 @@ export default function Chat() {
         {/* ─── Sidebar (Contacts) ─── */}
         <aside
           className={`
-            hidden md:block md:w-80 lg:w-96 flex-shrink-0
+            ${currentChat ? "hidden" : "flex"} md:flex md:w-80 lg:w-96 flex-shrink-0
             border-r border-slate-200/60 bg-white/40 backdrop-blur-2xl
             overflow-y-auto transition-all duration-400
-            ${currentChat ? "md:opacity-90" : "md:opacity-100"}
           `}
         >
           <Contacts contacts={contacts} changeChat={handleChatChange} />
         </aside>
 
         {/* ─── Main chat area ─── */}
-        <main className="flex-1 flex flex-col min-w-0 bg-white/30 backdrop-blur-md">
+        <main className={`
+          ${!currentChat ? "hidden" : "flex"} md:flex
+          flex-1 flex-col min-w-0 bg-white/30 backdrop-blur-md
+        `}>
 
-          {/* Mobile header */}
+          {/* Mobile header (Visible only when a chat is selected on small screens) */}
           <div
             className="
               md:hidden sticky top-0 z-20
               bg-white/70 backdrop-blur-2xl border-b border-slate-200/60
               px-4 py-3.5 flex items-center gap-3.5 shadow-sm
-              transition-all duration-300
             "
           >
             {currentChat && (
               <button
                 onClick={() => setCurrentChat(undefined)}
-                className="
-                  p-2.5 hover:bg-slate-100 active:bg-slate-200
-                  rounded-full transition-all duration-200 hover:scale-105
-                "
-                aria-label="Back to contacts"
+                className="p-2.5 hover:bg-slate-100 rounded-full transition-all"
               >
                 <svg className="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
             )}
-
-            {currentChat ? (
-              <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-slate-300 to-slate-400 flex-shrink-0 shadow-inner" />
-                <h2 className="font-semibold text-slate-800 truncate text-lg">
-                  {currentChat.username}
-                </h2>
-              </div>
-            ) : (
-              <h2 className="font-semibold text-slate-800 text-lg">Messages</h2>
-            )}
+            <h2 className="font-semibold text-slate-800 truncate text-lg">
+              {currentChat?.username || "Messages"}
+            </h2>
           </div>
 
-          {/* Chat content or Welcome */}
-          <div className="flex-1 overflow-hidden transition-opacity duration-400">
+          <div className="flex-1 overflow-hidden">
             {currentChat === undefined ? (
               <Welcome />
             ) : (
@@ -178,23 +166,21 @@ export default function Chat() {
       </div>
 
       {/* ─── Mobile floating contacts button ─── */}
-      <button
-        className="
-          md:hidden fixed bottom-6 right-6 z-40
-          bg-gradient-to-br from-slate-700 to-slate-900
-          text-white p-4 rounded-full
-          shadow-xl shadow-slate-500/30
-          hover:shadow-2xl hover:shadow-slate-600/40
-          hover:scale-110 active:scale-95
-          transition-all duration-300 ease-out
-        "
-        onClick={() => setCurrentChat(undefined)}
-        aria-label="Open contacts list"
-      >
-        <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M4 6h16M4 12h16M4 18h7" />
-        </svg>
-      </button>
+      {!currentChat && (
+        <button
+          className="
+            md:hidden fixed bottom-6 right-6 z-40
+            bg-gradient-to-br from-slate-700 to-slate-900
+            text-white p-4 rounded-full shadow-xl
+            transition-all duration-300 ease-out
+          "
+          onClick={() => setCurrentChat(undefined)}
+        >
+          <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M4 6h16M4 12h16M4 18h7" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }
