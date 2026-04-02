@@ -1,49 +1,41 @@
+// ChatInput.jsx
 import React, { useState, useRef, useEffect } from "react";
-import Picker from "emoji-picker-react";
-import { Smile, Paperclip, Send } from "lucide-react";
+import EmojiPicker from "emoji-picker-react";
+import { Smile, Send } from "lucide-react";
 
-export default function ChatInput({ handleSendMsg }) {
+export default function ChatInput({ handleSendMsg, darkMode }) {
   const [msg, setMsg] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-
   const pickerRef = useRef(null);
   const buttonRef = useRef(null);
+  const inputRef = useRef(null);
 
-  // toggle emoji picker
-  const handleEmojiPickerhideShow = () => {
-    setShowEmojiPicker(!showEmojiPicker);
-  };
-
-  // emoji click (stable version)
-  const handleEmojiClick = (event, emojiObject) => {
-    let message = msg;
-    message += emojiObject.emoji;
-    setMsg(message);
-  };
-
-  // close picker when clicking outside
+  // Close picker when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
+    const handleClickOutside = (e) => {
       if (
         pickerRef.current &&
-        !pickerRef.current.contains(event.target) &&
+        !pickerRef.current.contains(e.target) &&
         buttonRef.current &&
-        !buttonRef.current.contains(event.target)
+        !buttonRef.current.contains(e.target)
       ) {
         setShowEmojiPicker(false);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
-    return () =>
-      document.removeEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Fixed emoji click handler — new emoji-picker-react v4+ passes emojiData as first arg
+  const handleEmojiClick = (emojiData) => {
+    setMsg((prev) => prev + emojiData.emoji);
+    inputRef.current?.focus();
+  };
 
   const sendChat = (e) => {
     e.preventDefault();
-
     if (msg.trim().length > 0) {
-      handleSendMsg(msg);
+      handleSendMsg(msg.trim());
       setMsg("");
       setShowEmojiPicker(false);
     }
@@ -52,87 +44,87 @@ export default function ChatInput({ handleSendMsg }) {
   const isActive = msg.trim().length > 0;
 
   return (
-    <div className="relative px-3 pb-4 pt-2">
+    <div className="relative">
+      {/* Emoji Picker */}
+      {showEmojiPicker && (
+        <div
+          ref={pickerRef}
+          className="absolute bottom-full mb-2 left-0 z-50 shadow-2xl rounded-xl overflow-hidden"
+        >
+          <EmojiPicker
+            onEmojiClick={handleEmojiClick}
+            theme={darkMode ? "dark" : "light"}
+            height={350}
+            width={300}
+            searchDisabled={false}
+            skinTonesDisabled
+            previewConfig={{ showPreview: false }}
+          />
+        </div>
+      )}
 
-      {/* Input Bar */}
-      <div
-        className="
-        bg-white/70 backdrop-blur-2xl
-        border border-slate-200/70 rounded-full
-        shadow-lg
-        flex items-center gap-2 px-4 py-3
-      "
-      >
-        {/* Emoji Button */}
+      {/* Input bar */}
+      <div className={`
+        flex items-center gap-2 px-3 py-2 rounded-2xl border transition-colors duration-200
+        ${darkMode
+          ? "bg-slate-700/80 border-slate-600/60 focus-within:border-slate-500"
+          : "bg-white/70 backdrop-blur-xl border-slate-200/70 focus-within:border-slate-300 shadow-sm"
+        }
+      `}>
+        {/* Emoji button */}
         <button
           ref={buttonRef}
           type="button"
-          onClick={handleEmojiPickerhideShow}
-          className="p-2.5 rounded-full hover:bg-slate-100 transition"
+          onClick={() => setShowEmojiPicker((v) => !v)}
+          className={`p-2 rounded-full flex-shrink-0 transition-all duration-150 hover:scale-110 active:scale-95 ${
+            showEmojiPicker
+              ? darkMode ? "bg-slate-600 text-yellow-400" : "bg-slate-100 text-slate-700"
+              : darkMode ? "text-slate-400 hover:text-slate-200 hover:bg-slate-600" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+          }`}
+          title="Emoji"
         >
-          <Smile size={22} className="text-slate-600" />
-        </button>
-
-        {/* Attachment */}
-        <button
-          type="button"
-          disabled
-          className="p-2.5 rounded-full hover:bg-slate-100 transition"
-        >
-          <Paperclip size={22} className="text-slate-400" />
+          <Smile size={20} />
         </button>
 
         {/* Input */}
-        <form
-          onSubmit={sendChat}
-          className="flex-1 flex items-center min-w-0"
-        >
-          <input
-            type="text"
-            value={msg}
-            placeholder="Type a message..."
-            onChange={(e) => setMsg(e.target.value)}
-            className="
-            flex-1 bg-transparent outline-none
-            text-slate-800 placeholder-slate-400
-            text-base min-w-0
-          "
-          />
-        </form>
+        <input
+          ref={inputRef}
+          type="text"
+          value={msg}
+          placeholder="Type a message..."
+          onChange={(e) => setMsg(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              if (isActive) sendChat(e);
+            }
+          }}
+          className={`
+            flex-1 bg-transparent outline-none text-sm min-w-0
+            ${darkMode ? "text-slate-100 placeholder-slate-500" : "text-slate-800 placeholder-slate-400"}
+          `}
+        />
 
-        {/* Send Button */}
+        {/* Send button */}
         <button
           type="button"
           onClick={sendChat}
           disabled={!isActive}
           className={`
-            p-3 rounded-full transition-all
-            ${
-              isActive
-                ? "bg-slate-900 text-white hover:scale-105"
-                : "bg-slate-200 text-slate-400 cursor-not-allowed"
+            p-2.5 rounded-full flex-shrink-0 transition-all duration-150
+            ${isActive
+              ? darkMode
+                ? "bg-indigo-600 text-white hover:bg-indigo-500 hover:scale-105 active:scale-95"
+                : "bg-slate-900 text-white hover:bg-slate-700 hover:scale-105 active:scale-95"
+              : darkMode
+                ? "bg-slate-600/50 text-slate-500 cursor-not-allowed"
+                : "bg-slate-100 text-slate-300 cursor-not-allowed"
             }
           `}
         >
-          <Send size={20} />
+          <Send size={18} />
         </button>
       </div>
-
-      {/* Emoji Picker */}
-      {showEmojiPicker && (
-        <div
-          ref={pickerRef}
-          className="
-          absolute bottom-20 left-2
-          z-50
-          shadow-2xl
-        "
-        >
-          <Picker
-            onEmojiClick={handleEmojiClick}
-          />
-        </div>
-      )}
     </div>
   );
 }

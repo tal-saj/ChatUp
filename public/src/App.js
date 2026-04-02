@@ -15,19 +15,21 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/setAvatar" element={<SetAvatar />} />
-        
+
         {/* Protected Routes */}
         <Route path="/" element={
           <ProtectedRoute>
             <Chat />
           </ProtectedRoute>
         } />
+
+        {/* FriendsPage is also protected */}
         <Route path="/friends" element={
-         
+          <ProtectedRoute>
             <FriendsPage />
-         
+          </ProtectedRoute>
         } />
-        
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
