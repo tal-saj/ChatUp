@@ -51,14 +51,12 @@ module.exports.register = async (req, res, next) => {
   }
 };
 
-// ─── Returns only the current user's accepted friends ───────────────────────
-// Route: GET /api/auth/allusers/:id
-// The :id param is the current user's _id (kept for frontend compatibility).
+// Returns only friends, including their publicKey and lastSeen for E2E + online status
 module.exports.getAllUsers = async (req, res, next) => {
   try {
     const currentUser = await User.findById(req.params.id)
       .select("friends")
-      .populate("friends", "email username avatarImage _id");
+      .populate("friends", "email username avatarImage _id publicKey lastSeen");
 
     if (!currentUser) {
       return res.status(404).json({ msg: "User not found" });
@@ -83,6 +81,36 @@ module.exports.setAvatar = async (req, res, next) => {
       isSet: userData.isAvatarImageSet,
       image: userData.avatarImage,
     });
+  } catch (ex) {
+    next(ex);
+  }
+};
+
+// ── Upload public key after key generation on client ────────────────────────
+// Called once after login/register when the client generates its RSA key pair.
+// Body: { userId, publicKey }  (publicKey is a JWK JSON string)
+module.exports.uploadPublicKey = async (req, res, next) => {
+  try {
+    const { userId, publicKey } = req.body;
+    if (!userId || !publicKey)
+      return res.status(400).json({ msg: "userId and publicKey are required" });
+
+    await User.findByIdAndUpdate(userId, { publicKey });
+    return res.json({ msg: "Public key saved" });
+  } catch (ex) {
+    next(ex);
+  }
+};
+
+// ── Heartbeat – client calls this every 30s to mark itself online ────────────
+// Body: { userId }
+module.exports.heartbeat = async (req, res, next) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ msg: "userId is required" });
+
+    await User.findByIdAndUpdate(userId, { lastSeen: new Date() });
+    return res.json({ ok: true });
   } catch (ex) {
     next(ex);
   }

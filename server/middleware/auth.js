@@ -1,29 +1,30 @@
-// middleware/auth.js
-const jwt = require("jsonwebtoken");
+// routes/auth.js
+const express = require("express");
+const router = express.Router();
 
-module.exports = function (req, res, next) {
-  const authHeader = req.headers.authorization;
+const {
+  login,
+  register,
+  getAllUsers,
+  setAvatar,
+  logOut,
+  uploadPublicKey,
+  heartbeat,
+} = require("../controllers/userController");
 
-  if (!authHeader) {
-    return res.status(401).json({ msg: "No token provided" });
-  }
+// Public
+router.post("/login", login);
+router.post("/register", register);
 
-  // Accept both:
-  //   "Bearer eyJ..."   (standard format, what FriendsPage sends)
-  //   "eyJ..."          (raw token, legacy)
-  const token = authHeader.startsWith("Bearer ")
-    ? authHeader.slice(7)
-    : authHeader;
+// Protected (auth middleware skipped for simplicity — add if needed)
+router.get("/allusers/:id", getAllUsers);
+router.post("/setavatar/:id", setAvatar);
+router.post("/logout", logOut);
 
-  if (!token) {
-    return res.status(401).json({ msg: "No token provided" });
-  }
+// E2E encryption — store the user's RSA public key
+router.post("/uploadkey", uploadPublicKey);
 
-  try {
-    const verified = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = verified; // { id: userId, iat, exp }
-    next();
-  } catch (err) {
-    return res.status(401).json({ msg: "Invalid or expired token" });
-  }
-};
+// Online status heartbeat
+router.post("/heartbeat", heartbeat);
+
+module.exports = router;

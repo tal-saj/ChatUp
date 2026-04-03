@@ -5,7 +5,7 @@ const userSchema = new mongoose.Schema({
   username: {
     type: String,
     required: true,
-    minlength: 3,   // was "min" — only works on Numbers, not Strings
+    minlength: 3,
     maxlength: 20,
     unique: true,
     trim: true,
@@ -24,9 +24,6 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
     minlength: 8,
-    // NOTE: we do NOT use select:false here because userController
-    // needs to read it for bcrypt.compare, and we strip it manually
-    // via toObject() before sending to the client.
   },
 
   isAvatarImageSet: {
@@ -37,6 +34,21 @@ const userSchema = new mongoose.Schema({
   avatarImage: {
     type: String,
     default: "",
+  },
+
+  // ── E2E Encryption ──────────────────────────────
+  // Stores the user's RSA-OAEP public key as a JWK JSON string.
+  // The private key NEVER leaves the client.
+  publicKey: {
+    type: String,
+    default: "",
+  },
+
+  // ── Online Status ────────────────────────────────
+  // Updated by the client every ~30s via heartbeat endpoint.
+  lastSeen: {
+    type: Date,
+    default: null,
   },
 
   friends: [

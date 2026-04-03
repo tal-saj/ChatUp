@@ -1,9 +1,16 @@
+// models/messageModel.js
 const mongoose = require("mongoose");
 
 const MessageSchema = mongoose.Schema(
   {
     message: {
-      text: { type: String, required: true },
+      // Stores the RSA-OAEP encrypted ciphertext as a Base64 string.
+      // Two copies are stored per message so both parties can decrypt:
+      //   encryptedForSender    — encrypted with the sender's public key
+      //   encryptedForRecipient — encrypted with the recipient's public key
+      // The server never stores or sees the plaintext.
+      encryptedForSender: { type: String, required: true },
+      encryptedForRecipient: { type: String, required: true },
     },
     users: Array,
     sender: {
