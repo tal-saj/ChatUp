@@ -2,7 +2,18 @@
 const jwt = require("jsonwebtoken");
 
 module.exports = function (req, res, next) {
-  const token = req.headers.authorization;
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return res.status(401).json({ msg: "No token provided" });
+  }
+
+  // Accept both:
+  //   "Bearer eyJ..."   (standard format, what FriendsPage sends)
+  //   "eyJ..."          (raw token, legacy)
+  const token = authHeader.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : authHeader;
 
   if (!token) {
     return res.status(401).json({ msg: "No token provided" });
@@ -10,9 +21,9 @@ module.exports = function (req, res, next) {
 
   try {
     const verified = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = verified;
+    req.user = verified; // { id: userId, iat, exp }
     next();
   } catch (err) {
-    return res.status(401).json({ msg: "Invalid token" });
+    return res.status(401).json({ msg: "Invalid or expired token" });
   }
 };
