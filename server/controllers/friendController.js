@@ -6,12 +6,12 @@ exports.searchUsers = async (req, res, next) => {
   try {
     const { username } = req.query;
 
-    if (!username || username.trim() === "") {
+    if (!username || !username.trim()) {
       return res.json([]);
     }
 
     const users = await Users.find({
-      _id: { $ne: req.user.id },                          // exclude self
+      _id: { $ne: req.user.id },
       username: { $regex: username.trim(), $options: "i" },
     })
       .limit(20)
@@ -27,11 +27,9 @@ exports.recommendedUsers = async (req, res, next) => {
   try {
     const userId = req.user.id;
 
-    // Get IDs already in a relationship with the current user
     const currentUser = await Users.findById(userId).select("friends");
     const alreadyFriends = currentUser?.friends ?? [];
 
-    // Also exclude users with a pending request in either direction
     const existingRequests = await FriendRequest.find({
       $or: [{ from: userId }, { to: userId }],
       status: "pending",
@@ -47,7 +45,6 @@ exports.recommendedUsers = async (req, res, next) => {
 
     const users = await Users.find({
       _id: { $nin: [...excludedIds] },
-      isAvatarImageSet: true,        // only show users who completed setup
     })
       .limit(10)
       .select("username avatarImage");
@@ -67,12 +64,10 @@ exports.sendRequest = async (req, res, next) => {
       return res.status(400).json({ msg: "userId is required" });
     }
 
-    // Cannot send to yourself
     if (fromId === toId) {
       return res.status(400).json({ msg: "Cannot send a friend request to yourself" });
     }
 
-    // Check for an existing pending/accepted request in either direction
     const existing = await FriendRequest.findOne({
       $or: [
         { from: fromId, to: toId },
@@ -82,7 +77,7 @@ exports.sendRequest = async (req, res, next) => {
     });
 
     if (existing) {
-      return res.status(409).json({ msg: "Friend request already exists or users are already friends" });
+      return res.status(409).json({ msg: "Friend request already exists or already friends" });
     }
 
     const request = await FriendRequest.create({ from: fromId, to: toId });
@@ -119,7 +114,6 @@ exports.acceptRequest = async (req, res, next) => {
       return res.status(404).json({ msg: "Friend request not found" });
     }
 
-    // Only the recipient can accept
     if (request.to.toString() !== req.user.id) {
       return res.status(403).json({ msg: "Not authorised to accept this request" });
     }
@@ -131,7 +125,6 @@ exports.acceptRequest = async (req, res, next) => {
     request.status = "accepted";
     await request.save();
 
-    // Add each user to the other's friends list (avoid duplicates with $addToSet)
     await Users.findByIdAndUpdate(request.from, {
       $addToSet: { friends: request.to },
     });

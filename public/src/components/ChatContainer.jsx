@@ -13,25 +13,26 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
   const scrollRef = useRef(null);
   const pollTimer = useRef(null);
 
+  // Parse once and pull out the id so hooks can depend on a stable primitive
   const currentUser = (() => {
     try { return JSON.parse(localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY)); }
     catch { return null; }
   })();
+  const currentUserId = currentUser?._id ?? null;
 
-  // ── Decrypt a batch of messages ──────────────────────────────────────────
-  const decryptAll = async (rawMessages) => {
-    return Promise.all(
+  // ── Decrypt a batch of raw messages ─────────────────────────────────────
+  const decryptAll = async (rawMessages) =>
+    Promise.all(
       rawMessages.map(async (msg) => {
         const plaintext = await decryptMessage(msg.encryptedMessage);
         return { ...msg, message: plaintext ?? "🔒 Unable to decrypt" };
       })
     );
-  };
 
   // ── Initial load ─────────────────────────────────────────────────────────
   useEffect(() => {
     const fetchMessages = async () => {
-      if (!currentUser?._id || !currentChat?._id) {
+      if (!currentUserId || !currentChat?._id) {
         setMessages([]);
         setIsLoading(false);
         return;
@@ -40,7 +41,7 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
       setIsLoading(true);
       try {
         const { data } = await axios.post(recieveMessageRoute, {
-          from: currentUser._id,
+          from: currentUserId,
           to: currentChat._id,
         });
         const decrypted = await decryptAll(data);
@@ -54,16 +55,18 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
     };
 
     fetchMessages();
-    return () => clearInterval(pollTimer.current);
-  }, [currentChat?._id]);
 
-  // ── Polling for new messages every 3s ────────────────────────────────────
+    // Clear any existing poll timer when chat changes
+    return () => clearInterval(pollTimer.current);
+  }, [currentChat?._id, currentUserId]); // ✅ stable primitive, no warning
+
+  // ── Poll for new messages every 3s ──────────────────────────────────────
   const pollNewMessages = useCallback(async () => {
-    if (!currentUser?._id || !currentChat?._id || !lastFetchedAt) return;
+    if (!currentUserId || !currentChat?._id || !lastFetchedAt) return;
 
     try {
       const { data } = await axios.post(recieveMessageRoute, {
-        from: currentUser._id,
+        from: currentUserId,
         to: currentChat._id,
         after: lastFetchedAt,
       });
@@ -74,13 +77,13 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
         setLastFetchedAt(new Date().toISOString());
       }
     } catch {}
-  }, [currentChat?._id, currentUser?._id, lastFetchedAt]);
+  }, [currentChat?._id, currentUserId, lastFetchedAt]); // ✅ all deps declared
 
   useEffect(() => {
     if (!lastFetchedAt) return;
     pollTimer.current = setInterval(pollNewMessages, 3_000);
     return () => clearInterval(pollTimer.current);
-  }, [pollNewMessages, lastFetchedAt]);
+  }, [pollNewMessages, lastFetchedAt]); // ✅ no warning
 
   // ── Auto-scroll ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -91,38 +94,37 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
 
   // ── Send message ─────────────────────────────────────────────────────────
   const handleSendMsg = async (msg) => {
-    if (!msg?.trim() || !currentUser?._id || !currentChat?._id) return;
+    if (!msg?.trim() || !currentUserId || !currentChat?._id) return;
 
-    // We need the recipient's public key (comes from contact object fetched in Chat.jsx)
     const recipientPublicKey = currentChat.publicKey;
     const senderPublicKeyJwk = localStorage.getItem("chatup-public-key-jwk");
 
     if (!recipientPublicKey || !senderPublicKeyJwk) {
-      console.error("Missing public keys — cannot encrypt");
       alert("Encryption keys not available. Please refresh and try again.");
       return;
     }
 
-    // Optimistic plaintext display (will be replaced on next poll, but feels instant)
-    const optimistic = { _id: `opt-${Date.now()}`, fromSelf: true, message: msg, optimistic: true };
+    const optimistic = {
+      _id: `opt-${Date.now()}`,
+      fromSelf: true,
+      message: msg,
+      optimistic: true,
+    };
     setMessages((prev) => [...prev, optimistic]);
 
     try {
-      // Encrypt once for the sender (so they can read their own sent messages)
-      // and once for the recipient (so they can decrypt on their side)
       const [encryptedForSender, encryptedForRecipient] = await Promise.all([
         encryptMessage(msg, senderPublicKeyJwk),
         encryptMessage(msg, recipientPublicKey),
       ]);
 
       await axios.post(sendMessageRoute, {
-        from: currentUser._id,
+        from: currentUserId,
         to: currentChat._id,
         encryptedForSender,
         encryptedForRecipient,
       });
 
-      // Update lastFetchedAt so poller doesn't re-fetch and duplicate
       setLastFetchedAt(new Date().toISOString());
     } catch (err) {
       console.error("Message send failed", err);
@@ -134,7 +136,9 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
   const dm = darkMode;
 
   return (
-    <div className={`relative flex h-full flex-col transition-colors duration-300 ${dm ? "bg-slate-900" : "bg-gradient-to-b from-slate-50 via-slate-100 to-white"}`}>
+    <div className={`relative flex h-full flex-col transition-colors duration-300 ${
+      dm ? "bg-slate-900" : "bg-gradient-to-b from-slate-50 via-slate-100 to-white"
+    }`}>
 
       {/* Header */}
       <header className={`
@@ -153,7 +157,6 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
                 onError={(e) => (e.target.src = "/fallback-avatar.png")}
               />
             </div>
-            {/* Online indicator in header */}
             <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full ring-2 transition-colors ${
               currentChat?.online
                 ? dm ? "bg-emerald-500 ring-slate-800" : "bg-emerald-500 ring-white"
@@ -164,13 +167,15 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
             <h3 className={`font-semibold tracking-tight ${dm ? "text-slate-100" : "text-slate-900"}`}>
               {currentChat?.username || "Chat"}
             </h3>
-            <p className={`text-xs font-medium ${currentChat?.online ? "text-emerald-500" : dm ? "text-slate-500" : "text-slate-400"}`}>
+            <p className={`text-xs font-medium ${
+              currentChat?.online ? "text-emerald-500" : dm ? "text-slate-500" : "text-slate-400"
+            }`}>
               {currentChat?.online ? "Online" : "Offline"}
             </p>
           </div>
         </div>
 
-        {/* E2E encryption badge */}
+        {/* E2E badge */}
         <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
           dm ? "bg-emerald-900/40 text-emerald-400" : "bg-emerald-50 text-emerald-700 border border-emerald-200"
         }`}>
@@ -179,7 +184,7 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
         </div>
       </header>
 
-      {/* E2E info banner (shown once at top of messages) */}
+      {/* E2E info banner */}
       {!isLoading && (
         <div className={`mx-4 mt-4 mb-1 flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-xs ${
           dm ? "bg-slate-800/60 text-slate-500 border border-slate-700/40" : "bg-slate-100/80 text-slate-400 border border-slate-200"
@@ -189,12 +194,14 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
         </div>
       )}
 
-      {/* Messages area */}
+      {/* Messages */}
       <main className="flex-1 overflow-y-auto px-4 py-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-300/70 scrollbar-track-transparent scrollbar-thumb-rounded-full">
         {isLoading ? (
           <div className="flex h-full items-center justify-center">
             <div className="flex flex-col items-center gap-3">
-              <div className={`h-8 w-8 rounded-full border-2 border-t-transparent animate-spin ${dm ? "border-slate-500" : "border-slate-400"}`} />
+              <div className={`h-8 w-8 rounded-full border-2 border-t-transparent animate-spin ${
+                dm ? "border-slate-500" : "border-slate-400"
+              }`} />
               <p className={dm ? "text-slate-500" : "text-slate-400"}>Decrypting messages...</p>
             </div>
           </div>
@@ -229,7 +236,9 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
                 `}>
                   <p className="break-words">{msg.message}</p>
                   {msg.createdAt && (
-                    <p className={`text-[10px] mt-1 text-right ${isSent ? "text-white/50" : dm ? "text-slate-500" : "text-slate-400"}`}>
+                    <p className={`text-[10px] mt-1 text-right ${
+                      isSent ? "text-white/50" : dm ? "text-slate-500" : "text-slate-400"
+                    }`}>
                       {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </p>
                   )}
@@ -240,7 +249,7 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
         )}
       </main>
 
-      {/* Input area */}
+      {/* Input */}
       <div className={`p-3 pb-[env(safe-area-inset-bottom,12px)] border-t transition-colors duration-300 ${
         dm ? "border-slate-700/60 bg-slate-800/50" : "border-slate-200/60"
       }`}>
