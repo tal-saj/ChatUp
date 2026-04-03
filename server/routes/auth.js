@@ -1,24 +1,28 @@
-const express = require("express");
-const router = express.Router();
+// middleware/auth.js
+const jwt = require("jsonwebtoken");
 
-const {
-  login,
-  register,
-  getAllUsers,
-  setAvatar,
-  logOut,
-} = require("../controllers/userController");
+module.exports = function (req, res, next) {
+  const authHeader = req.headers.authorization;
 
+  if (!authHeader) {
+    return res.status(401).json({ msg: "No token provided" });
+  }
 
-// Public routes
-router.post("/login", /* authLimiter, validateLogin, */ login);
-router.post("/register", /* authLimiter, validateRegister, */ register);
+  // FriendsPage sends: "Bearer eyJ..."
+  // Strip the prefix before verifying
+  const token = authHeader.startsWith("Bearer ")
+    ? authHeader.slice(7).trim()
+    : authHeader.trim();
 
-// Protected routes (should use auth middleware in production)
-router.get("/allusers/:id", /* authMiddleware, */ getAllUsers);
-router.post("/setavatar/:id", /* authMiddleware, */ setAvatar);
+  if (!token) {
+    return res.status(401).json({ msg: "No token provided" });
+  }
 
-// Logout – changed to POST (more secure)
-router.post("/logout", /* authMiddleware, */ logOut);
-
-module.exports = router;
+  try {
+    const verified = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = verified; // { id: userId, iat, exp }
+    next();
+  } catch (err) {
+    return res.status(401).json({ msg: "Invalid or expired token" });
+  }
+};
