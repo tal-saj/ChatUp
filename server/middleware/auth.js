@@ -1,30 +1,28 @@
-// routes/auth.js
-const express = require("express");
-const router = express.Router();
+// middleware/auth.js
+const jwt = require("jsonwebtoken");
 
-const {
-  login,
-  register,
-  getAllUsers,
-  setAvatar,
-  logOut,
-  uploadPublicKey,
-  heartbeat,
-} = require("../controllers/userController");
+module.exports = function (req, res, next) {
+  const authHeader = req.headers.authorization;
 
-// Public
-router.post("/login", login);
-router.post("/register", register);
+  if (!authHeader) {
+    return res.status(401).json({ msg: "No token provided" });
+  }
 
-// Protected (auth middleware skipped for simplicity — add if needed)
-router.get("/allusers/:id", getAllUsers);
-router.post("/setavatar/:id", setAvatar);
-router.post("/logout", logOut);
+  // FriendsPage sends: "Bearer eyJ..."
+  // Old middleware did jwt.verify("Bearer eyJ...") — the prefix breaks verification.
+  const token = authHeader.startsWith("Bearer ")
+    ? authHeader.slice(7).trim()
+    : authHeader.trim();
 
-// E2E encryption — store the user's RSA public key
-router.post("/uploadkey", uploadPublicKey);
+  if (!token) {
+    return res.status(401).json({ msg: "No token provided" });
+  }
 
-// Online status heartbeat
-router.post("/heartbeat", heartbeat);
-
-module.exports = router;
+  try {
+    const verified = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = verified; // { id: userId, iat, exp }
+    next();
+  } catch (err) {
+    return res.status(401).json({ msg: "Invalid or expired token" });
+  }
+};
