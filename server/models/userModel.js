@@ -31,12 +31,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: "",
   },
-  // E2E encryption — RSA public key stored as JWK JSON string
   publicKey: {
     type: String,
     default: "",
   },
-  // Online status — updated by client heartbeat every 30s
   lastSeen: {
     type: Date,
     default: null,

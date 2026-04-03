@@ -1,11 +1,8 @@
-// index.js – Vercel Serverless Functions (HTTP API only)
-
+// index.js
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
-
 const connectDB = require("./lib/connectDB");
-
 const authRoutes = require("./routes/auth");
 const messageRoutes = require("./routes/messages");
 const friendsRoutes = require("./routes/friends");
@@ -14,121 +11,71 @@ require("dotenv").config();
 
 const app = express();
 
+// ── CORS ─────────────────────────────────────────────────────────────────────
+// Must be configured before every other middleware so OPTIONS preflights
+// get a proper response instead of a 500 from an unmatched route.
+const corsOptions = {
+  origin: [
+    "https://chat-up-frontend-three.vercel.app",
+    "http://localhost:3000",   // local dev
+  ],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+  optionsSuccessStatus: 200, // some browsers (Safari) choke on 204
+};
 
-// ────────────────────────────────────────────────
-// ENV DEBUG (optional – remove later)
-// ────────────────────────────────────────────────
-console.log("=== MONGO ENV DEBUG ===");
-console.log("MONGO_URL exists?", !!process.env.MONGO_URL);
-console.log("MONGO_URL length:", process.env.MONGO_URL?.length || 0);
-console.log(
-  "MONGO_URL first 60 chars:",
-  process.env.MONGO_URL?.substring(0, 60) || "MISSING"
-);
-console.log("=== MONGO ENV DEBUG END ===");
+app.use(cors(corsOptions));
 
-
-// ────────────────────────────────────────────────
-// CORS – allow frontend domains
-// ────────────────────────────────────────────────
-app.use(cors());
+// Handle every OPTIONS preflight explicitly — critical for Vercel serverless
+app.options("*", cors(corsOptions));
 
 app.use(express.json());
 
-
-// ────────────────────────────────────────────────
-// ⭐ AUTO CONNECT DB BEFORE EVERY REQUEST
-// (Critical for Vercel serverless)
-// ────────────────────────────────────────────────
+// ── DB middleware ─────────────────────────────────────────────────────────────
 app.use(async (req, res, next) => {
   try {
     await connectDB();
     next();
   } catch (err) {
     console.error("DB connection middleware error:", err.message);
-    res.status(500).json({
-      error: "Database connection failed",
-      details: err.message,
-    });
+    res.status(500).json({ error: "Database connection failed", details: err.message });
   }
 });
 
-
-// ────────────────────────────────────────────────
-// Debug routes
-// ────────────────────────────────────────────────
-app.get("/debug", (req, res) => {
-  res.json({
-    message: "Backend is alive",
-    time: new Date().toISOString(),
-    env: process.env.NODE_ENV || "unknown",
-    mongoReadyState: mongoose.connection.readyState, // should now be 1
-  });
-});
-
-
-app.get("/test-db", async (req, res) => {
-  try {
-    await mongoose.connection.db.admin().ping();
-
-    res.json({
-      status: "MongoDB ping successful",
-      readyState: mongoose.connection.readyState,
-    });
-
-  } catch (err) {
-    console.error("DB test error:", err.message);
-    res.status(500).json({
-      error: "MongoDB connection failed",
-      details: err.message,
-    });
-  }
-});
-
+// ── Debug routes ──────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   res.json({
     message: "Chat App API",
     version: "1.0.0",
     status: "online",
     database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
-    endpoints: {
-      debug: "/debug",
-      testDb: "/test-db",
-      auth: "/api/auth",
-      messages: "/api/messages",
-      friends: "/api/friends"
-    },
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 });
 
+app.get("/debug", (req, res) => {
+  res.json({
+    message: "Backend is alive",
+    time: new Date().toISOString(),
+    mongoReadyState: mongoose.connection.readyState,
+  });
+});
 
-// ────────────────────────────────────────────────
-// Routes
-// ────────────────────────────────────────────────
+// ── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/friends", friendsRoutes);
 
-// ────────────────────────────────────────────────
-// Global error handler
-// ────────────────────────────────────────────────
+// ── Global error handler ──────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
   console.error("SERVER ERROR:", {
     message: err.message,
     stack: err.stack?.substring(0, 500),
     path: req.path,
     method: req.method,
-    body: req.body,
   });
-
-  res.status(500).json({
-    error: "Internal Server Error",
-  });
+  res.status(500).json({ error: "Internal Server Error" });
 });
 
-
-// ────────────────────────────────────────────────
-// Export for Vercel
-// ────────────────────────────────────────────────
 module.exports = app;

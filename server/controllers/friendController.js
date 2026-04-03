@@ -113,13 +113,8 @@ exports.acceptRequest = async (req, res, next) => {
     request.status = "accepted";
     await request.save();
 
-    // $addToSet prevents duplicates if accepted twice
-    await Users.findByIdAndUpdate(request.from, {
-      $addToSet: { friends: request.to },
-    });
-    await Users.findByIdAndUpdate(request.to, {
-      $addToSet: { friends: request.from },
-    });
+    await Users.findByIdAndUpdate(request.from, { $addToSet: { friends: request.to } });
+    await Users.findByIdAndUpdate(request.to, { $addToSet: { friends: request.from } });
 
     res.json({ msg: "Friend added" });
   } catch (ex) {

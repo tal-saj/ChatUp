@@ -51,7 +51,7 @@ module.exports.register = async (req, res, next) => {
   }
 };
 
-// Returns only the current user's accepted friends
+// Returns only the current user's accepted friends (with publicKey + lastSeen for E2E + online status)
 module.exports.getAllUsers = async (req, res, next) => {
   try {
     const currentUser = await User.findById(req.params.id)
