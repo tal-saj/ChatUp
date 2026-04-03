@@ -10,7 +10,6 @@ const userSchema = new mongoose.Schema({
     unique: true,
     trim: true,
   },
-
   email: {
     type: String,
     required: true,
@@ -19,57 +18,37 @@ const userSchema = new mongoose.Schema({
     trim: true,
     lowercase: true,
   },
-
   password: {
     type: String,
     required: true,
     minlength: 8,
   },
-
   isAvatarImageSet: {
     type: Boolean,
     default: false,
   },
-
   avatarImage: {
     type: String,
     default: "",
   },
-
-  // ── E2E Encryption ──────────────────────────────
-  // Stores the user's RSA-OAEP public key as a JWK JSON string.
-  // The private key NEVER leaves the client.
+  // E2E encryption — RSA public key stored as JWK JSON string
   publicKey: {
     type: String,
     default: "",
   },
-
-  // ── Online Status ────────────────────────────────
-  // Updated by the client every ~30s via heartbeat endpoint.
+  // Online status — updated by client heartbeat every 30s
   lastSeen: {
     type: Date,
     default: null,
   },
-
   friends: [
-    {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Users",
-    },
+    { type: mongoose.Schema.Types.ObjectId, ref: "Users" },
   ],
-
   friendRequests: [
-    {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Users",
-    },
+    { type: mongoose.Schema.Types.ObjectId, ref: "Users" },
   ],
-
   sentRequests: [
-    {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Users",
-    },
+    { type: mongoose.Schema.Types.ObjectId, ref: "Users" },
   ],
 });
 

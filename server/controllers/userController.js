@@ -51,7 +51,7 @@ module.exports.register = async (req, res, next) => {
   }
 };
 
-// Returns only friends, including their publicKey and lastSeen for E2E + online status
+// Returns only the current user's accepted friends
 module.exports.getAllUsers = async (req, res, next) => {
   try {
     const currentUser = await User.findById(req.params.id)
@@ -86,9 +86,6 @@ module.exports.setAvatar = async (req, res, next) => {
   }
 };
 
-// ── Upload public key after key generation on client ────────────────────────
-// Called once after login/register when the client generates its RSA key pair.
-// Body: { userId, publicKey }  (publicKey is a JWK JSON string)
 module.exports.uploadPublicKey = async (req, res, next) => {
   try {
     const { userId, publicKey } = req.body;
@@ -102,8 +99,6 @@ module.exports.uploadPublicKey = async (req, res, next) => {
   }
 };
 
-// ── Heartbeat – client calls this every 30s to mark itself online ────────────
-// Body: { userId }
 module.exports.heartbeat = async (req, res, next) => {
   try {
     const { userId } = req.body;

@@ -8,8 +8,6 @@ module.exports = function (req, res, next) {
     return res.status(401).json({ msg: "No token provided" });
   }
 
-  // FriendsPage sends: "Bearer eyJ..."
-  // Old middleware did jwt.verify("Bearer eyJ...") — the prefix breaks verification.
   const token = authHeader.startsWith("Bearer ")
     ? authHeader.slice(7).trim()
     : authHeader.trim();
@@ -20,7 +18,7 @@ module.exports = function (req, res, next) {
 
   try {
     const verified = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = verified; // { id: userId, iat, exp }
+    req.user = verified;
     next();
   } catch (err) {
     return res.status(401).json({ msg: "Invalid or expired token" });
