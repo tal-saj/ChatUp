@@ -12,6 +12,7 @@ import {
   callStatusRoute,
   callCandidatesRoute,
   callEndRoute,
+  cleanup,
 } from "../utils/APIRoutes";
 
 // ── ICE server config ─────────────────────────────────────────────────────────
@@ -254,7 +255,7 @@ export function useWebRTC({ onCallEnded, onRemoteStream }) {
       // (they'll be pushed to server via onicecandidate)
       return data.callId;
     },
-    [createPeerConnection, getLocalStream, addLocalTracks, startCandidatePolling, onCallEnded]
+    [createPeerConnection, getLocalStream, addLocalTracks, startCandidatePolling, onCallEnded, cleanup]
   );
 
   // ── CALLEE: accept an incoming call ─────────────────────────────────────────
@@ -294,7 +295,7 @@ export function useWebRTC({ onCallEnded, onRemoteStream }) {
     } catch { /* ignore */ }
     await cleanup();
     onCallEnded?.("rejected");
-  }, [onCallEnded]);
+  }, [onCallEnded, cleanup]);
 
   // ── Mute / unmute local audio ────────────────────────────────────────────────
   const setMuted = useCallback((muted) => {
@@ -322,7 +323,7 @@ export function useWebRTC({ onCallEnded, onRemoteStream }) {
       } catch { /* ignore */ }
     }
     onCallEnded?.(reason);
-  }, [onCallEnded]);
+  }, [onCallEnded, cleanup]);
 
   // ── Internal cleanup ─────────────────────────────────────────────────────────
   const cleanup = useCallback(async () => {
