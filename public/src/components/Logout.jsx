@@ -2,7 +2,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LogOut, Loader2 } from "lucide-react";
-import axios from "axios";
 import { logoutRoute } from "../utils/APIRoutes";
 import api from "../utils/axiosConfig";
 
