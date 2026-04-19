@@ -34,6 +34,7 @@ app.use(express.json());
 
 // ── DB middleware ─────────────────────────────────────────────────────────────
 app.use(async (req, res, next) => {
+  if (req.method === "OPTIONS") return next(); // ← add this line
   try {
     await connectDB();
     next();
@@ -69,6 +70,10 @@ app.use("/api/friends", friendsRoutes);
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
+  // Ensure CORS headers survive errors
+  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
+  res.header("Access-Control-Allow-Credentials", "true");
+
   console.error("SERVER ERROR:", {
     message: err.message,
     stack: err.stack?.substring(0, 500),

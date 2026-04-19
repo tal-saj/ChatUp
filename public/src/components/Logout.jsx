@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { LogOut, Loader2 } from "lucide-react";
 import axios from "axios";
 import { logoutRoute } from "../utils/APIRoutes";
+import api from "../utils/axiosConfig";
 
 export default function Logout() {
   const navigate = useNavigate();
@@ -27,9 +28,7 @@ export default function Logout() {
       }
 
       // POST request to invalidate session (recommended)
-      const response = await axios.post(logoutRoute, {
-        userId: userData._id,
-      });
+      const response = await api.post(logoutRoute, { userId: userData._id });
 
       // Adjust based on your backend response structure
       if (response.status === 200 || response.data?.success) {
