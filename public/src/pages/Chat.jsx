@@ -5,9 +5,8 @@ import { generateAndStoreKeyPair, hasKeyPair, getStoredPublicKeyJwk } from "../u
 import ChatContainer from "../components/ChatContainer";
 import Contacts from "../components/Contacts";
 import Welcome from "../components/Welcome";
-import api from "../utils/axiosConfig"; // Using custom axios instance
+import api from "../utils/axiosConfig";
 
-// A user is "online" if their lastSeen is within 45 seconds
 const isOnline = (lastSeen) => {
   if (!lastSeen) return false;
   return Date.now() - new Date(lastSeen).getTime() < 45_000;
@@ -24,7 +23,7 @@ export default function Chat() {
   const [currentChat, setCurrentChat] = useState(undefined);
   const [currentUser, setCurrentUser] = useState(undefined);
   const [isLoading, setIsLoading] = useState(true);
-  const [unreadCounts, setUnreadCounts] = useState({}); // { senderId: count }
+  const [unreadCounts, setUnreadCounts] = useState({});
   const [unreadSince, setUnreadSince] = useState(new Date().toISOString());
 
   const [darkMode, setDarkMode] = useState(() =>
@@ -70,11 +69,9 @@ export default function Chat() {
         return;
       }
 
-      // Generate RSA key pair if this device doesn't have one yet
       if (!hasKeyPair()) {
         try {
           const { publicJwk } = await generateAndStoreKeyPair();
-          // Replaced axios.post with api.post
           await api.post(uploadKeyRoute, {
             userId: currentUser._id,
             publicKey: JSON.stringify(publicJwk),
@@ -83,10 +80,8 @@ export default function Chat() {
           console.error("Key generation failed:", err);
         }
       } else {
-        // Ensure server has the public key (handles clearing localStorage manually)
         const stored = getStoredPublicKeyJwk();
         if (stored) {
-          // Replaced axios.post with api.post
           await api.post(uploadKeyRoute, {
             userId: currentUser._id,
             publicKey: stored,
@@ -95,7 +90,6 @@ export default function Chat() {
       }
 
       try {
-        // Replaced axios.get with api.get
         const { data } = await api.get(`${allUsersRoute}/${currentUser._id}`);
         setContacts(data || []);
       } catch (err) {
@@ -111,14 +105,10 @@ export default function Chat() {
   // ── 3. Heartbeat – mark self as online every 30s ───────────────────────
   useEffect(() => {
     if (!currentUser) return;
-
-    // Replaced axios.post with api.post
     const beat = () =>
       api.post(heartbeatRoute, { userId: currentUser._id }).catch(() => {});
-
-    beat(); // immediate first beat
+    beat();
     heartbeatTimer.current = setInterval(beat, 30_000);
-
     return () => clearInterval(heartbeatTimer.current);
   }, [currentUser]);
 
@@ -126,7 +116,6 @@ export default function Chat() {
   const refreshContacts = useCallback(async () => {
     if (!currentUser) return;
     try {
-      // Replaced axios.get with api.get
       const { data } = await api.get(`${allUsersRoute}/${currentUser._id}`);
       setContacts(data || []);
     } catch {}
@@ -144,7 +133,6 @@ export default function Chat() {
 
     const fetchUnread = async () => {
       try {
-        // Replaced axios.post with api.post
         const { data } = await api.post(unreadCountsRoute, {
           userId: currentUser._id,
           since: unreadSince,
@@ -157,7 +145,6 @@ export default function Chat() {
             });
             return merged;
           });
-          // Browser notification
           Object.entries(data).forEach(([sid, count]) => {
             const sender = contacts.find((c) => c._id === sid);
             if (sender && Notification.permission === "granted") {
@@ -183,9 +170,34 @@ export default function Chat() {
     }
   }, []);
 
+  // ── 7. Inactivity logout ───────────────────────────────────────────────
+  // MUST be before any conditional return — Rules of Hooks
+  useEffect(() => {
+    if (!currentUser) return; // guard inside, not outside
+    const TIMEOUT = 30 * 60 * 1000;
+    let timer;
+
+    const reset = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        localStorage.removeItem(process.env.REACT_APP_LOCALHOST_KEY);
+        navigate("/login");
+      }, TIMEOUT);
+    };
+
+    const events = ["mousemove", "keydown", "click", "scroll", "touchstart"];
+    events.forEach((e) => window.addEventListener(e, reset));
+    reset();
+
+    return () => {
+      clearTimeout(timer);
+      events.forEach((e) => window.removeEventListener(e, reset));
+    };
+  }, [currentUser, navigate]);
+
+  // ── Handlers ───────────────────────────────────────────────────────────
   const handleChatChange = (chat) => {
     setCurrentChat(chat);
-    // Clear unread badge for this contact when opening the chat
     if (chat?._id) {
       setUnreadCounts((prev) => {
         const next = { ...prev };
@@ -195,6 +207,7 @@ export default function Chat() {
     }
   };
 
+  // ── Conditional return AFTER all hooks ─────────────────────────────────
   if (isLoading || !currentUser) {
     return (
       <div className={`fixed inset-0 flex items-center justify-center ${darkMode ? "bg-slate-900" : "bg-slate-50"}`}>
@@ -208,40 +221,11 @@ export default function Chat() {
     );
   }
 
-  // Augment contacts with live online status
   const contactsWithStatus = contacts.map((c) => ({
     ...c,
     online: isOnline(c.lastSeen),
   }));
 
-  // ── Auto-logout Inactivity Timer ─────────────────────────────────────────
-  useEffect(() => {
-    const TIMEOUT = 30 * 60 * 1000; // 30 minutes
-    let timer;
-
-    const reset = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        // Clear user data and redirect to login
-        localStorage.removeItem(process.env.REACT_APP_LOCALHOST_KEY);
-        navigate("/login");
-      }, TIMEOUT);
-    };
-
-    const events = ["mousemove", "keydown", "click", "scroll", "touchstart"];
-    
-    // Attach listeners to track activity
-    events.forEach((e) => window.addEventListener(e, reset));
-    
-    reset(); // Initial timer start
-
-    return () => {
-      clearTimeout(timer);
-      events.forEach((e) => window.removeEventListener(e, reset));
-    };
-  }, [navigate]);
-
-  // ── Render Logic ──
   return (
     <div className={`relative flex h-screen w-screen overflow-hidden transition-colors duration-300 ${
       darkMode ? "bg-slate-950" : "bg-gradient-to-br from-slate-100 via-slate-50 to-white"
@@ -318,7 +302,7 @@ export default function Chat() {
                 currentChat={currentChat}
                 socket={socket}
                 darkMode={darkMode}
-                onNewMessage={() => {}} // real-time handled by polling
+                onNewMessage={() => {}}
               />
             )}
           </div>
