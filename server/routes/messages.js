@@ -1,9 +1,9 @@
-// routes/messages.js
 const { addMessage, getMessages, getUnreadCounts } = require("../controllers/messageController");
 const router = require("express").Router();
+const auth = require("../middleware/auth");
 
-router.post("/addmsg/", addMessage);
-router.post("/getmsg/", getMessages);
-router.post("/unread/", getUnreadCounts);
+router.post("/addmsg/", auth, addMessage);
+router.post("/getmsg/", auth, getMessages);
+router.post("/unread/", auth, getUnreadCounts);
 
 module.exports = router;

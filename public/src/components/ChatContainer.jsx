@@ -1,10 +1,9 @@
-// ChatContainer.jsx
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import ChatInput from "./ChatInput";
-import axios from "axios";
 import { Lock } from "lucide-react";
 import { sendMessageRoute, recieveMessageRoute } from "../utils/APIRoutes";
 import { encryptMessage, decryptMessage } from "../utils/crypto";
+import api from "../utils/axiosConfig"; // Import the custom api instance
 
 export default function ChatContainer({ currentChat, socket, darkMode }) {
   const [messages, setMessages] = useState([]);
@@ -40,7 +39,8 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
 
       setIsLoading(true);
       try {
-        const { data } = await axios.post(recieveMessageRoute, {
+        // Replaced axios.post with api.post
+        const { data } = await api.post(recieveMessageRoute, {
           from: currentUserId,
           to: currentChat._id,
         });
@@ -58,14 +58,15 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
 
     // Clear any existing poll timer when chat changes
     return () => clearInterval(pollTimer.current);
-  }, [currentChat?._id, currentUserId]); // ✅ stable primitive, no warning
+  }, [currentChat?._id, currentUserId]); 
 
   // ── Poll for new messages every 3s ──────────────────────────────────────
   const pollNewMessages = useCallback(async () => {
     if (!currentUserId || !currentChat?._id || !lastFetchedAt) return;
 
     try {
-      const { data } = await axios.post(recieveMessageRoute, {
+      // Replaced axios.post with api.post
+      const { data } = await api.post(recieveMessageRoute, {
         from: currentUserId,
         to: currentChat._id,
         after: lastFetchedAt,
@@ -77,13 +78,13 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
         setLastFetchedAt(new Date().toISOString());
       }
     } catch {}
-  }, [currentChat?._id, currentUserId, lastFetchedAt]); // ✅ all deps declared
+  }, [currentChat?._id, currentUserId, lastFetchedAt]);
 
   useEffect(() => {
     if (!lastFetchedAt) return;
     pollTimer.current = setInterval(pollNewMessages, 3_000);
     return () => clearInterval(pollTimer.current);
-  }, [pollNewMessages, lastFetchedAt]); // ✅ no warning
+  }, [pollNewMessages, lastFetchedAt]);
 
   // ── Auto-scroll ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -118,7 +119,8 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
         encryptMessage(msg, recipientPublicKey),
       ]);
 
-      await axios.post(sendMessageRoute, {
+      // Replaced axios.post with api.post
+      await api.post(sendMessageRoute, {
         from: currentUserId,
         to: currentChat._id,
         encryptedForSender,

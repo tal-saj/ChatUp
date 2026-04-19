@@ -113,7 +113,7 @@ module.exports.heartbeat = async (req, res, next) => {
 
 module.exports.logOut = (req, res, next) => {
   try {
-    const userId = req.body.userId || req.params.id;
+    const userId = req.user.id; // ← consistent, from JWT via auth middleware
     if (!userId) return res.status(400).json({ msg: "User id is required" });
     return res.status(200).json({ msg: "Logged out successfully" });
   } catch (ex) {

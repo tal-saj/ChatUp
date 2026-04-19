@@ -1,12 +1,11 @@
-// Chat.jsx
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { allUsersRoute, uploadKeyRoute, heartbeatRoute, unreadCountsRoute } from "../utils/APIRoutes";
 import { generateAndStoreKeyPair, hasKeyPair, getStoredPublicKeyJwk } from "../utils/crypto";
 import ChatContainer from "../components/ChatContainer";
 import Contacts from "../components/Contacts";
 import Welcome from "../components/Welcome";
+import api from "../utils/axiosConfig"; // Using custom axios instance
 
 // A user is "online" if their lastSeen is within 45 seconds
 const isOnline = (lastSeen) => {
@@ -75,7 +74,8 @@ export default function Chat() {
       if (!hasKeyPair()) {
         try {
           const { publicJwk } = await generateAndStoreKeyPair();
-          await axios.post(uploadKeyRoute, {
+          // Replaced axios.post with api.post
+          await api.post(uploadKeyRoute, {
             userId: currentUser._id,
             publicKey: JSON.stringify(publicJwk),
           });
@@ -86,7 +86,8 @@ export default function Chat() {
         // Ensure server has the public key (handles clearing localStorage manually)
         const stored = getStoredPublicKeyJwk();
         if (stored) {
-          await axios.post(uploadKeyRoute, {
+          // Replaced axios.post with api.post
+          await api.post(uploadKeyRoute, {
             userId: currentUser._id,
             publicKey: stored,
           }).catch(() => {});
@@ -94,7 +95,8 @@ export default function Chat() {
       }
 
       try {
-        const { data } = await axios.get(`${allUsersRoute}/${currentUser._id}`);
+        // Replaced axios.get with api.get
+        const { data } = await api.get(`${allUsersRoute}/${currentUser._id}`);
         setContacts(data || []);
       } catch (err) {
         console.error("Failed to load contacts:", err);
@@ -110,8 +112,9 @@ export default function Chat() {
   useEffect(() => {
     if (!currentUser) return;
 
+    // Replaced axios.post with api.post
     const beat = () =>
-      axios.post(heartbeatRoute, { userId: currentUser._id }).catch(() => {});
+      api.post(heartbeatRoute, { userId: currentUser._id }).catch(() => {});
 
     beat(); // immediate first beat
     heartbeatTimer.current = setInterval(beat, 30_000);
@@ -123,7 +126,8 @@ export default function Chat() {
   const refreshContacts = useCallback(async () => {
     if (!currentUser) return;
     try {
-      const { data } = await axios.get(`${allUsersRoute}/${currentUser._id}`);
+      // Replaced axios.get with api.get
+      const { data } = await api.get(`${allUsersRoute}/${currentUser._id}`);
       setContacts(data || []);
     } catch {}
   }, [currentUser]);
@@ -140,7 +144,8 @@ export default function Chat() {
 
     const fetchUnread = async () => {
       try {
-        const { data } = await axios.post(unreadCountsRoute, {
+        // Replaced axios.post with api.post
+        const { data } = await api.post(unreadCountsRoute, {
           userId: currentUser._id,
           since: unreadSince,
         });
@@ -209,6 +214,34 @@ export default function Chat() {
     online: isOnline(c.lastSeen),
   }));
 
+  // ── Auto-logout Inactivity Timer ─────────────────────────────────────────
+  useEffect(() => {
+    const TIMEOUT = 30 * 60 * 1000; // 30 minutes
+    let timer;
+
+    const reset = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        // Clear user data and redirect to login
+        localStorage.removeItem(process.env.REACT_APP_LOCALHOST_KEY);
+        navigate("/login");
+      }, TIMEOUT);
+    };
+
+    const events = ["mousemove", "keydown", "click", "scroll", "touchstart"];
+    
+    // Attach listeners to track activity
+    events.forEach((e) => window.addEventListener(e, reset));
+    
+    reset(); // Initial timer start
+
+    return () => {
+      clearTimeout(timer);
+      events.forEach((e) => window.removeEventListener(e, reset));
+    };
+  }, [navigate]);
+
+  // ── Render Logic ──
   return (
     <div className={`relative flex h-screen w-screen overflow-hidden transition-colors duration-300 ${
       darkMode ? "bg-slate-950" : "bg-gradient-to-br from-slate-100 via-slate-50 to-white"

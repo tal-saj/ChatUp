@@ -1,8 +1,7 @@
-// FriendsPage.jsx
 import React, { useState, useEffect } from "react";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Search, UserPlus, Users, Check, X, UserCheck } from "lucide-react";
+import api from "../utils/axiosConfig"; // Central API instance
 
 import {
   searchUsersRoute,
@@ -26,36 +25,8 @@ export default function FriendsPage() {
 
   const navigate = useNavigate();
 
-  // Read dark mode from localStorage (same key used in Chat.jsx)
+  // Read dark mode from localStorage
   const darkMode = localStorage.getItem("chatup-theme") === "dark";
-
-  const api = React.useMemo(() => {
-    const instance = axios.create({
-      baseURL: process.env.REACT_APP_BACKEND_URL,
-    });
-
-    instance.interceptors.request.use((config) => {
-      try {
-        const user = JSON.parse(localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY));
-        if (user?.token) config.headers.Authorization = `Bearer ${user.token}`;
-        else delete config.headers.Authorization;
-      } catch {}
-      return config;
-    });
-
-    instance.interceptors.response.use(
-      (res) => res,
-      (err) => {
-        if (err.response?.status === 401) {
-          localStorage.removeItem(process.env.REACT_APP_LOCALHOST_KEY);
-          navigate("/login", { replace: true });
-        }
-        return Promise.reject(err);
-      }
-    );
-
-    return instance;
-  }, [navigate]);
 
   useEffect(() => {
     const stored = localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY);
@@ -88,7 +59,7 @@ export default function FriendsPage() {
     };
 
     fetchData();
-  }, [api, navigate]);
+  }, [navigate]); // Removed 'api' from deps as it's now a static import
 
   const searchUsers = async (value) => {
     setSearch(value);
@@ -203,7 +174,7 @@ export default function FriendsPage() {
           </div>
         </div>
 
-        {/* Search bar (always visible) */}
+        {/* Search bar */}
         <div
           className={`relative mb-5 ${mounted ? "" : "opacity-0"}`}
           style={{ transition: "opacity 0.3s ease 0.1s", opacity: mounted ? 1 : 0 }}
@@ -260,8 +231,6 @@ export default function FriendsPage() {
 
         {/* Tab content */}
         <div style={{ opacity: mounted ? 1 : 0, transition: "opacity 0.3s ease 0.2s" }}>
-
-          {/* Search results */}
           {activeTab === "search" && (
             <div className="space-y-2">
               {!loading.search && search.trim() && searchResults.length === 0 && (
@@ -292,7 +261,6 @@ export default function FriendsPage() {
             </div>
           )}
 
-          {/* Recommended */}
           {activeTab === "recommended" && (
             <div className="space-y-2">
               {recommended.length === 0 ? (
@@ -315,7 +283,6 @@ export default function FriendsPage() {
             </div>
           )}
 
-          {/* Requests */}
           {activeTab === "requests" && (
             <div className="space-y-2">
               {requests.length === 0 ? (
@@ -342,6 +309,7 @@ export default function FriendsPage() {
   );
 }
 
+// Sub-components stay exactly the same
 function UserCard({ user, dm, delay, actionState, primaryAction, primaryLabel, primaryIcon, color }) {
   const colorMap = {
     blue: dm ? "bg-indigo-600 hover:bg-indigo-500" : "bg-slate-800 hover:bg-slate-700",
