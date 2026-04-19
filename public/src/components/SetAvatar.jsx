@@ -1,7 +1,7 @@
 // SetAvatar.jsx
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../utils/axiosConfig";
 import { Buffer } from "buffer";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -78,7 +78,7 @@ export default function SetAvatar() {
         return;
       }
 
-      const { data } = await axios.post(`${setAvatarRoute}/${user._id}`, {
+      const { data } = await api.post(`${setAvatarRoute}/${user._id}`, {
         image: avatars[selectedAvatar],
       });
 

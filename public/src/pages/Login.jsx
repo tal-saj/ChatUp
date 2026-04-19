@@ -1,7 +1,7 @@
 // Login.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import axios from "axios";
+import api from "../utils/axiosConfig";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Logo from "../assets/logo.svg";
@@ -51,7 +51,7 @@ export default function Login() {
     setIsSubmitting(true);
 
     try {
-      const { data } = await axios.post(loginRoute, {
+      const { data } = await api.post(loginRoute, {
         username: values.username,
         password: values.password,
       });
