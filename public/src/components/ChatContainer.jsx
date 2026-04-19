@@ -1,25 +1,33 @@
+// components/ChatContainer.jsx  — UPDATED
+// Only change from original: added CallButton to header, accepts onCall + callDisabled props
+
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import ChatInput from "./ChatInput";
+import CallButton from "./CallButton";                              // ← CALL
 import { Lock } from "lucide-react";
 import { sendMessageRoute, recieveMessageRoute } from "../utils/APIRoutes";
 import { encryptMessage, decryptMessage } from "../utils/crypto";
-import api from "../utils/axiosConfig"; // Import the custom api instance
+import api from "../utils/axiosConfig";
 
-export default function ChatContainer({ currentChat, socket, darkMode }) {
+export default function ChatContainer({
+  currentChat,
+  socket,
+  darkMode,
+  onCall,          // ← CALL: ({ contact, callType }) => void
+  callDisabled,    // ← CALL: boolean — true while a call is active
+}) {
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastFetchedAt, setLastFetchedAt] = useState(null);
   const scrollRef = useRef(null);
   const pollTimer = useRef(null);
 
-  // Parse once and pull out the id so hooks can depend on a stable primitive
   const currentUser = (() => {
     try { return JSON.parse(localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY)); }
     catch { return null; }
   })();
   const currentUserId = currentUser?._id ?? null;
 
-  // ── Decrypt a batch of raw messages ─────────────────────────────────────
   const decryptAll = async (rawMessages) =>
     Promise.all(
       rawMessages.map(async (msg) => {
@@ -28,7 +36,6 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
       })
     );
 
-  // ── Initial load ─────────────────────────────────────────────────────────
   useEffect(() => {
     const fetchMessages = async () => {
       if (!currentUserId || !currentChat?._id) {
@@ -36,10 +43,8 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
         setIsLoading(false);
         return;
       }
-
       setIsLoading(true);
       try {
-        // Replaced axios.post with api.post
         const { data } = await api.post(recieveMessageRoute, {
           from: currentUserId,
           to: currentChat._id,
@@ -53,25 +58,18 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
         setIsLoading(false);
       }
     };
-
     fetchMessages();
-
-    // Clear any existing poll timer when chat changes
     return () => clearInterval(pollTimer.current);
-  }, [currentChat?._id, currentUserId]); 
+  }, [currentChat?._id, currentUserId]);
 
-  // ── Poll for new messages every 3s ──────────────────────────────────────
   const pollNewMessages = useCallback(async () => {
     if (!currentUserId || !currentChat?._id || !lastFetchedAt) return;
-
     try {
-      // Replaced axios.post with api.post
       const { data } = await api.post(recieveMessageRoute, {
         from: currentUserId,
         to: currentChat._id,
         after: lastFetchedAt,
       });
-
       if (data.length > 0) {
         const decrypted = await decryptAll(data);
         setMessages((prev) => [...prev, ...decrypted]);
@@ -86,47 +84,33 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
     return () => clearInterval(pollTimer.current);
   }, [pollNewMessages, lastFetchedAt]);
 
-  // ── Auto-scroll ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
 
-  // ── Send message ─────────────────────────────────────────────────────────
   const handleSendMsg = async (msg) => {
     if (!msg?.trim() || !currentUserId || !currentChat?._id) return;
-
     const recipientPublicKey = currentChat.publicKey;
     const senderPublicKeyJwk = localStorage.getItem("chatup-public-key-jwk");
-
     if (!recipientPublicKey || !senderPublicKeyJwk) {
       alert("Encryption keys not available. Please refresh and try again.");
       return;
     }
-
-    const optimistic = {
-      _id: `opt-${Date.now()}`,
-      fromSelf: true,
-      message: msg,
-      optimistic: true,
-    };
+    const optimistic = { _id: `opt-${Date.now()}`, fromSelf: true, message: msg, optimistic: true };
     setMessages((prev) => [...prev, optimistic]);
-
     try {
       const [encryptedForSender, encryptedForRecipient] = await Promise.all([
         encryptMessage(msg, senderPublicKeyJwk),
         encryptMessage(msg, recipientPublicKey),
       ]);
-
-      // Replaced axios.post with api.post
       await api.post(sendMessageRoute, {
         from: currentUserId,
         to: currentChat._id,
         encryptedForSender,
         encryptedForRecipient,
       });
-
       setLastFetchedAt(new Date().toISOString());
     } catch (err) {
       console.error("Message send failed", err);
@@ -177,12 +161,22 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
           </div>
         </div>
 
-        {/* E2E badge */}
-        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-          dm ? "bg-emerald-900/40 text-emerald-400" : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-        }`}>
-          <Lock size={11} />
-          <span>End-to-end encrypted</span>
+        {/* Right side: Call button + E2E badge */}
+        <div className="flex items-center gap-2">
+          {/* ← CALL: CallButton sits here */}
+          <CallButton
+            contact={currentChat}
+            onCall={() => onCall?.({ contact: currentChat, callType: "audio" })}
+            darkMode={dm}
+            disabled={callDisabled}
+          />
+
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+            dm ? "bg-emerald-900/40 text-emerald-400" : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+          }`}>
+            <Lock size={11} />
+            <span>End-to-end encrypted</span>
+          </div>
         </div>
       </header>
 
@@ -216,7 +210,6 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
           messages.map((msg, index) => {
             const isLast = index === messages.length - 1;
             const isSent = msg.fromSelf;
-
             return (
               <div
                 key={msg._id || index}
@@ -227,12 +220,10 @@ export default function ChatContainer({ currentChat, socket, darkMode }) {
                 <div className={`
                   max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed shadow-sm
                   ${isSent
-                    ? dm
-                      ? "bg-indigo-600 text-white rounded-br-sm"
-                      : "bg-gradient-to-br from-slate-700 to-slate-900 text-white rounded-br-sm"
-                    : dm
-                      ? "bg-slate-700/80 text-slate-100 rounded-bl-sm border border-slate-600/50"
-                      : "bg-white/80 backdrop-blur-sm border border-slate-200/80 text-slate-800 rounded-bl-sm"
+                    ? dm ? "bg-indigo-600 text-white rounded-br-sm"
+                         : "bg-gradient-to-br from-slate-700 to-slate-900 text-white rounded-br-sm"
+                    : dm ? "bg-slate-700/80 text-slate-100 rounded-bl-sm border border-slate-600/50"
+                         : "bg-white/80 backdrop-blur-sm border border-slate-200/80 text-slate-800 rounded-bl-sm"
                   }
                   ${msg.optimistic ? "opacity-70" : ""}
                 `}>

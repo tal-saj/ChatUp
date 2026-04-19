@@ -6,6 +6,7 @@ const connectDB = require("./lib/connectDB");
 const authRoutes = require("./routes/routes_auth");   // ← kept original filename
 const messageRoutes = require("./routes/messages");
 const friendsRoutes = require("./routes/friends");
+const callRoutes = require("./routes/calls");
 
 require("dotenv").config();
 
@@ -71,6 +72,7 @@ app.get("/debug", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/friends", friendsRoutes);
+app.use("/api/calls", callRoutes);
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use((err, req, res, next) => {

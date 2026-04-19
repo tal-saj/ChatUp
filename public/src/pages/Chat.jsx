@@ -1,3 +1,7 @@
+// pages/Chat.jsx  — FULL UPDATED FILE
+// Changes from original: added IncomingCallBanner, ActiveCall, useWebRTC integration
+// Search "// ← CALL" to find every new line
+
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { allUsersRoute, uploadKeyRoute, heartbeatRoute, unreadCountsRoute } from "../utils/APIRoutes";
@@ -5,6 +9,9 @@ import { generateAndStoreKeyPair, hasKeyPair, getStoredPublicKeyJwk } from "../u
 import ChatContainer from "../components/ChatContainer";
 import Contacts from "../components/Contacts";
 import Welcome from "../components/Welcome";
+import IncomingCallBanner from "../components/IncomingCallBanner"; // ← CALL
+import ActiveCall from "../components/ActiveCall";                 // ← CALL
+import { useWebRTC } from "../hooks/useWebRTC";                    // ← CALL
 import api from "../utils/axiosConfig";
 
 const isOnline = (lastSeen) => {
@@ -26,6 +33,11 @@ export default function Chat() {
   const [unreadCounts, setUnreadCounts] = useState({});
   const [unreadSince, setUnreadSince] = useState(new Date().toISOString());
 
+  // ── Call state ── ← CALL
+  const [activeCall, setActiveCall]         = useState(null);  // { contact, callType }
+  const [remoteStream, setRemoteStream]     = useState(null);
+  const [callActive, setCallActive]         = useState(false); // is a call in progress?
+
   const [darkMode, setDarkMode] = useState(() =>
     localStorage.getItem("chatup-theme") === "dark"
   );
@@ -38,11 +50,68 @@ export default function Chat() {
     });
   };
 
+  // ── WebRTC hook ── ← CALL
+  const { startCall, acceptCall, rejectCall, hangup, setMuted } = useWebRTC({
+    onRemoteStream: (stream) => setRemoteStream(stream),
+    onCallEnded: (reason) => {
+      setActiveCall(null);
+      setRemoteStream(null);
+      setCallActive(false);
+    },
+  });
+
+  // ── Handle outgoing call ── ← CALL
+  const handleStartCall = useCallback(async ({ contact, callType = "audio" }) => {
+    if (callActive) return; // already in a call
+    try {
+      await startCall({ calleeId: contact._id, callType });
+      setActiveCall({ contact, callType });
+      setCallActive(true);
+    } catch (err) {
+      const msg = err?.name === "NotAllowedError"
+        ? "Microphone access was denied. Please allow it in your browser settings."
+        : "Could not start the call. Please try again.";
+      alert(msg);
+    }
+  }, [callActive, startCall]);
+
+  // ── Handle incoming call accepted ── ← CALL
+  const handleAcceptCall = useCallback(async (incomingCall) => {
+    if (callActive) return;
+    const contact = incomingCall.caller;
+    try {
+      await acceptCall({
+        callId: incomingCall.callId,
+        offer: incomingCall.offer,
+        callType: incomingCall.callType,
+      });
+      setActiveCall({ contact, callType: incomingCall.callType });
+      setCallActive(true);
+    } catch (err) {
+      const msg = err?.name === "NotAllowedError"
+        ? "Microphone access was denied. Please allow it in your browser settings."
+        : "Could not accept the call. Please try again.";
+      alert(msg);
+    }
+  }, [callActive, acceptCall]);
+
+  // ── Handle incoming call rejected ── ← CALL
+  const handleRejectCall = useCallback(async (incomingCall) => {
+    await rejectCall(incomingCall.callId);
+  }, [rejectCall]);
+
+  // ── Handle hang up ── ← CALL
+  const handleHangup = useCallback(async () => {
+    await hangup("ended");
+    setActiveCall(null);
+    setRemoteStream(null);
+    setCallActive(false);
+  }, [hangup]);
+
   // ── 1. Load current user ────────────────────────────────────────────────
   useEffect(() => {
     const userData = localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY);
     if (!userData) { navigate("/login"); return; }
-
     try {
       const parsed = JSON.parse(userData);
       if (parsed?._id) {
@@ -60,59 +129,39 @@ export default function Chat() {
   // ── 2. E2E key setup + fetch contacts ──────────────────────────────────
   useEffect(() => {
     if (!currentUser) return;
-
     const setup = async () => {
       setIsLoading(true);
-
-      if (!currentUser.isAvatarImageSet) {
-        navigate("/setAvatar");
-        return;
-      }
-
+      if (!currentUser.isAvatarImageSet) { navigate("/setAvatar"); return; }
       if (!hasKeyPair()) {
         try {
           const { publicJwk } = await generateAndStoreKeyPair();
-          await api.post(uploadKeyRoute, {
-            userId: currentUser._id,
-            publicKey: JSON.stringify(publicJwk),
-          });
-        } catch (err) {
-          console.error("Key generation failed:", err);
-        }
+          await api.post(uploadKeyRoute, { userId: currentUser._id, publicKey: JSON.stringify(publicJwk) });
+        } catch (err) { console.error("Key generation failed:", err); }
       } else {
         const stored = getStoredPublicKeyJwk();
         if (stored) {
-          await api.post(uploadKeyRoute, {
-            userId: currentUser._id,
-            publicKey: stored,
-          }).catch(() => {});
+          await api.post(uploadKeyRoute, { userId: currentUser._id, publicKey: stored }).catch(() => {});
         }
       }
-
       try {
         const { data } = await api.get(`${allUsersRoute}/${currentUser._id}`);
         setContacts(data || []);
-      } catch (err) {
-        console.error("Failed to load contacts:", err);
-      } finally {
-        setIsLoading(false);
-      }
+      } catch (err) { console.error("Failed to load contacts:", err); }
+      finally { setIsLoading(false); }
     };
-
     setup();
   }, [currentUser, navigate]);
 
-  // ── 3. Heartbeat – mark self as online every 30s ───────────────────────
+  // ── 3. Heartbeat ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!currentUser) return;
-    const beat = () =>
-      api.post(heartbeatRoute, { userId: currentUser._id }).catch(() => {});
+    const beat = () => api.post(heartbeatRoute, { userId: currentUser._id }).catch(() => {});
     beat();
     heartbeatTimer.current = setInterval(beat, 30_000);
     return () => clearInterval(heartbeatTimer.current);
   }, [currentUser]);
 
-  // ── 4. Refresh contacts (online status) every 35s ─────────────────────
+  // ── 4. Refresh contacts every 35s ────────────────────────────────────
   const refreshContacts = useCallback(async () => {
     if (!currentUser) return;
     try {
@@ -127,10 +176,9 @@ export default function Chat() {
     return () => clearInterval(contactsRefreshTimer.current);
   }, [currentUser, refreshContacts]);
 
-  // ── 5. Poll for unread message counts every 5s ─────────────────────────
+  // ── 5. Unread message polling ─────────────────────────────────────────
   useEffect(() => {
     if (!currentUser) return;
-
     const fetchUnread = async () => {
       try {
         const { data } = await api.post(unreadCountsRoute, {
@@ -158,25 +206,22 @@ export default function Chat() {
         }
       } catch {}
     };
-
     unreadTimer.current = setInterval(fetchUnread, 5_000);
     return () => clearInterval(unreadTimer.current);
   }, [currentUser, contacts, unreadSince]);
 
-  // ── 6. Request notification permission once ────────────────────────────
+  // ── 6. Notification permission ───────────────────────────────────────
   useEffect(() => {
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
   }, []);
 
-  // ── 7. Inactivity logout ───────────────────────────────────────────────
-  // MUST be before any conditional return — Rules of Hooks
+  // ── 7. Inactivity logout ─────────────────────────────────────────────
   useEffect(() => {
-    if (!currentUser) return; // guard inside, not outside
+    if (!currentUser) return;
     const TIMEOUT = 30 * 60 * 1000;
     let timer;
-
     const reset = () => {
       clearTimeout(timer);
       timer = setTimeout(() => {
@@ -184,18 +229,16 @@ export default function Chat() {
         navigate("/login");
       }, TIMEOUT);
     };
-
     const events = ["mousemove", "keydown", "click", "scroll", "touchstart"];
     events.forEach((e) => window.addEventListener(e, reset));
     reset();
-
     return () => {
       clearTimeout(timer);
       events.forEach((e) => window.removeEventListener(e, reset));
     };
   }, [currentUser, navigate]);
 
-  // ── Handlers ───────────────────────────────────────────────────────────
+  // ── Handlers ──────────────────────────────────────────────────────────
   const handleChatChange = (chat) => {
     setCurrentChat(chat);
     if (chat?._id) {
@@ -207,7 +250,6 @@ export default function Chat() {
     }
   };
 
-  // ── Conditional return AFTER all hooks ─────────────────────────────────
   if (isLoading || !currentUser) {
     return (
       <div className={`fixed inset-0 flex items-center justify-center ${darkMode ? "bg-slate-900" : "bg-slate-50"}`}>
@@ -230,6 +272,28 @@ export default function Chat() {
     <div className={`relative flex h-screen w-screen overflow-hidden transition-colors duration-300 ${
       darkMode ? "bg-slate-950" : "bg-gradient-to-br from-slate-100 via-slate-50 to-white"
     }`}>
+
+      {/* ── Incoming call banner (global, always mounted) ── ← CALL */}
+      {!callActive && (
+        <IncomingCallBanner
+          onAccept={handleAcceptCall}
+          onReject={handleRejectCall}
+          darkMode={darkMode}
+        />
+      )}
+
+      {/* ── Active call overlay ── ← CALL */}
+      {callActive && activeCall && (
+        <ActiveCall
+          contact={activeCall.contact}
+          callType={activeCall.callType}
+          remoteStream={remoteStream}
+          onHangup={handleHangup}
+          onMuteChange={setMuted}
+          darkMode={darkMode}
+        />
+      )}
+
       <div className={`
         relative flex w-full max-w-[1800px] mx-auto h-full
         shadow-2xl rounded-2xl overflow-hidden transition-all duration-500
@@ -303,6 +367,8 @@ export default function Chat() {
                 socket={socket}
                 darkMode={darkMode}
                 onNewMessage={() => {}}
+                onCall={handleStartCall}  // ← CALL: pass down to header
+                callDisabled={callActive} // ← CALL: disable button during active call
               />
             )}
           </div>

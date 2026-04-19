@@ -20,3 +20,12 @@ export const friendRequestsRoute      = `/api/friends/requests`;
 export const sendFriendRequestRoute   = `/api/friends/send-request`;
 export const acceptFriendRequestRoute = `/api/friends/accept`;
 export const rejectFriendRequestRoute = `/api/friends/reject`;
+
+// Calls
+export const callOfferRoute      = `/api/calls/offer`;
+export const callAnswerRoute     = `/api/calls/answer`;
+export const callCandidateRoute  = `/api/calls/candidate`;
+export const callIncomingRoute   = `/api/calls/incoming`;
+export const callStatusRoute     = `/api/calls/status`;   // + /:callId
+export const callCandidatesRoute = `/api/calls/candidates`; // + /:callId
+export const callEndRoute        = `/api/calls/end`;
