@@ -80,7 +80,7 @@ export default function SetAvatar() {
 
       const { data } = await api.post(`${setAvatarRoute}/${user._id}`, {
         image: avatars[selectedAvatar],
-      });
+      }); 
 
       if (data.isSet) {
         const updatedUser = {
