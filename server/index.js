@@ -3,7 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const connectDB = require("./lib/connectDB");
-const authRoutes = require("./routes/auth");
+const authRoutes = require("./routes/routes_auth");   // ← kept original filename
 const messageRoutes = require("./routes/messages");
 const friendsRoutes = require("./routes/friends");
 
