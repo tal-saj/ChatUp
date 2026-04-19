@@ -12,7 +12,6 @@ import {
   callStatusRoute,
   callCandidatesRoute,
   callEndRoute,
-  cleanup,
 } from "../utils/APIRoutes";
 
 // ── ICE server config ─────────────────────────────────────────────────────────
@@ -74,6 +73,24 @@ export function useWebRTC({ onCallEnded, onRemoteStream }) {
   const statusPollRef    = useRef(null);  // setInterval for answer polling
   const candidatePollRef = useRef(null);  // setInterval for ICE candidate polling
   const seenCandidates   = useRef(new Set()); // dedupe candidates
+
+   // ── Internal cleanup ─────────────────────────────────────────────────────────
+  const cleanup = useCallback(async () => {
+    clearInterval(statusPollRef.current);
+    clearInterval(candidatePollRef.current);
+
+    // Stop all local media tracks (releases mic/camera indicator)
+    localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    localStreamRef.current = null;
+
+    // Close peer connection
+    pcRef.current?.close();
+    pcRef.current = null;
+
+    callIdRef.current = null;
+    roleRef.current = null;
+    seenCandidates.current = new Set();
+  }, []);
 
   // ── Build RTCPeerConnection with all event handlers ─────────────────────────
   const createPeerConnection = useCallback(() => {
@@ -325,23 +342,7 @@ export function useWebRTC({ onCallEnded, onRemoteStream }) {
     onCallEnded?.(reason);
   }, [onCallEnded, cleanup]);
 
-  // ── Internal cleanup ─────────────────────────────────────────────────────────
-  const cleanup = useCallback(async () => {
-    clearInterval(statusPollRef.current);
-    clearInterval(candidatePollRef.current);
-
-    // Stop all local media tracks (releases mic/camera indicator)
-    localStreamRef.current?.getTracks().forEach((t) => t.stop());
-    localStreamRef.current = null;
-
-    // Close peer connection
-    pcRef.current?.close();
-    pcRef.current = null;
-
-    callIdRef.current = null;
-    roleRef.current = null;
-    seenCandidates.current = new Set();
-  }, []);
+ 
 
   return {
     startCall,
