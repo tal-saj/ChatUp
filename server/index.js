@@ -12,35 +12,29 @@ require("dotenv").config();
 const app = express();
 
 // ── CORS ─────────────────────────────────────────────────────────────────────
-// Must be configured before every other middleware so OPTIONS preflights
-// get a proper response instead of a 500 from an unmatched route.
-const corsOptions = {
-  origin: [
-    "https://chat-up-frontend-three.vercel.app",
-    "http://localhost:3000",   // local dev
-  ],
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true,
-  optionsSuccessStatus: 200, // some browsers (Safari) choke on 204
-};
 
 app.use(cors(corsOptions));
 
-// Handle every OPTIONS preflight explicitly — critical for Vercel serverless
-app.options("*", cors(corsOptions));
+// Short-circuit ALL OPTIONS preflights immediately — before DB middleware
+app.options("*", (req, res) => {
+  res.header("Access-Control-Allow-Origin", req.headers.origin);
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type,Authorization");
+  res.header("Access-Control-Allow-Credentials", "true");
+  return res.sendStatus(200);
+});
+
 
 app.use(express.json());
 
 // ── DB middleware ─────────────────────────────────────────────────────────────
 app.use(async (req, res, next) => {
-  if (req.method === "OPTIONS") return next(); // ← add this line
   try {
     await connectDB();
     next();
   } catch (err) {
-    console.error("DB connection middleware error:", err.message);
-    res.status(500).json({ error: "Database connection failed", details: err.message });
+    console.error("DB connection error:", err.message);
+    res.status(500).json({ error: "Database connection failed" });
   }
 });
 
