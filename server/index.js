@@ -3,7 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const connectDB = require("./lib/connectDB");
-const authRoutes = require("./routes/routes_auth");
+const authRoutes = require("./routes/auth");
 const messageRoutes = require("./routes/messages");
 const friendsRoutes = require("./routes/friends");
 
@@ -11,11 +11,21 @@ require("dotenv").config();
 
 const app = express();
 
-// ── CORS ─────────────────────────────────────────────────────────────────────
+// ── CORS ──────────────────────────────────────────────────────────────────────
+const corsOptions = {
+  origin: [
+    "https://chat-up-frontend-three.vercel.app",
+    "http://localhost:3000",
+  ],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+  optionsSuccessStatus: 200,
+};
 
 app.use(cors(corsOptions));
 
-// Short-circuit ALL OPTIONS preflights immediately — before DB middleware
+// Short-circuit ALL OPTIONS preflights before DB middleware
 app.options("*", (req, res) => {
   res.header("Access-Control-Allow-Origin", req.headers.origin);
   res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
@@ -24,11 +34,11 @@ app.options("*", (req, res) => {
   return res.sendStatus(200);
 });
 
-
 app.use(express.json());
 
 // ── DB middleware ─────────────────────────────────────────────────────────────
 app.use(async (req, res, next) => {
+  if (req.method === "OPTIONS") return next();
   try {
     await connectDB();
     next();
@@ -64,7 +74,6 @@ app.use("/api/friends", friendsRoutes);
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
-  // Ensure CORS headers survive errors
   res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
   res.header("Access-Control-Allow-Credentials", "true");
 
