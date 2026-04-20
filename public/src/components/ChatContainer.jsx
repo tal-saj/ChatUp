@@ -168,7 +168,7 @@ export default function ChatContainer({
         <div className="flex items-center gap-2">
           <CallButton
             contact={currentChat}
-            onCall={() => onCall?.({ contact: currentChat, callType: "audio" })}
+            onCall={({ contact, callType }) => onCall?.({ contact, callType })}
             darkMode={dm}
             disabled={callDisabled}
           />

@@ -40,10 +40,11 @@ export default function Chat() {
   const [mobileView,   setMobileView]   = useState("contacts");
 
   // ── Call state ───────────────────────────────────────────────────────────────
-  const [activeCall,   setActiveCall]   = useState(null);   // { contact, callType }
-  const [remoteStream, setRemoteStream] = useState(null);
-  const [callActive,   setCallActive]   = useState(false);
-  const [callerStatus, setCallerStatus] = useState(null);   // "ringing" | null
+  const [activeCall,    setActiveCall]    = useState(null);   // { contact, callType }
+  const [remoteStream,  setRemoteStream]  = useState(null);
+  const [callActive,    setCallActive]    = useState(false);
+  const [callerStatus,  setCallerStatus]  = useState(null);   // "ringing" | null
+  const [callEndReason, setCallEndReason] = useState(null);   // "rejected" | "missed" | null
 
   const [darkMode, setDarkMode] = useState(() =>
     localStorage.getItem("chatup-theme") === "dark"
@@ -76,6 +77,11 @@ export default function Chat() {
       setRemoteStream(null);
       setCallActive(false);
       setCallerStatus(null);
+      // Show feedback only for rejection/miss (not for normal "ended")
+      if (reason === "rejected" || reason === "missed") {
+        setCallEndReason(reason);
+        setTimeout(() => setCallEndReason(null), 3_500);
+      }
     },
   });
 
@@ -498,6 +504,33 @@ export default function Chat() {
           </div>
         </div>
       </div>
+      {/* ── Call end notification (rejected / missed) ── */}
+      {callEndReason && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl border animate-fadeDown"
+          style={{
+            background: darkMode ? "rgba(30,41,59,0.97)" : "rgba(255,255,255,0.97)",
+            borderColor: darkMode ? "rgba(71,85,105,0.6)" : "rgba(203,213,225,0.8)",
+          }}
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-500/15">
+            <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" />
+            </svg>
+          </span>
+          <p className={`text-sm font-semibold ${darkMode ? "text-slate-200" : "text-slate-800"}`}>
+            {callEndReason === "rejected" ? "Call declined" : "No answer"}
+          </p>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes fadeDown {
+          from { opacity: 0; transform: translate(-50%, -12px); }
+          to   { opacity: 1; transform: translate(-50%, 0); }
+        }
+        .animate-fadeDown { animation: fadeDown 0.3s ease-out forwards; }
+      `}</style>
     </div>
   );
 }
