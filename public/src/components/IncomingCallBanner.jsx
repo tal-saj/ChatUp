@@ -1,21 +1,28 @@
 // components/IncomingCallBanner.jsx
+// Edge cases handled:
+//   • call-on-call: banner hidden by parent when callActive=true
+//   • caller cancels before answer: status poll detects "ended"/"missed" → dismiss
+//   • reject: posts end to server so caller gets "rejected" status
+//   • network hiccup: poll catches up when reconnected
+//   • multiple rapid incoming calls: activeRef prevents stacking
+
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { Phone, PhoneOff, PhoneIncoming } from "lucide-react";
+import { Phone, PhoneOff, PhoneIncoming, Video } from "lucide-react";
 import api from "../utils/axiosConfig";
 import { callIncomingRoute, callStatusRoute } from "../utils/APIRoutes";
 
-const POLL_MS        = 2_000; // poll for new incoming calls
-const STATUS_POLL_MS = 2_000; // poll status of the displayed call
+const POLL_MS        = 2_000;
+const STATUS_POLL_MS = 2_000;
 
 export default function IncomingCallBanner({ onAccept, onReject, darkMode }) {
   const [incomingCall, setIncomingCall] = useState(null);
-  const pollRef       = useRef(null); // incoming-call poll
-  const statusPollRef = useRef(null); // displayed-call status poll
+  const pollRef       = useRef(null);
+  const statusPollRef = useRef(null);
   const audioCtxRef   = useRef(null);
   const ringtoneRef   = useRef(null);
   const activeRef     = useRef(false);
 
-  // ── Ringtone (no audio file needed) ─────────────────────────────────────────
+  // ── Ringtone ─────────────────────────────────────────────────────────────────
   const startRingtone = useCallback(() => {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -35,7 +42,7 @@ export default function IncomingCallBanner({ onAccept, onReject, darkMode }) {
       };
       play();
       ringtoneRef.current = setInterval(play, 1_800);
-    } catch { /* ignore — silent fallback */ }
+    } catch { /* silent fallback */ }
   }, []);
 
   const stopRingtone = useCallback(() => {
@@ -45,7 +52,7 @@ export default function IncomingCallBanner({ onAccept, onReject, darkMode }) {
     audioCtxRef.current = null;
   }, []);
 
-  // ── Dismiss the displayed call (without sending reject to server) ────────────
+  // ── Dismiss (no server call — used when call disappears on its own) ──────────
   const dismiss = useCallback(() => {
     stopRingtone();
     clearInterval(statusPollRef.current);
@@ -54,23 +61,24 @@ export default function IncomingCallBanner({ onAccept, onReject, darkMode }) {
     activeRef.current = false;
   }, [stopRingtone]);
 
-  // ── Poll status of the currently-displayed call ──────────────────────────────
-  // Handles: caller hung up before callee answered, call expired, etc.
+  // ── Poll status of the displayed call ────────────────────────────────────────
+  // Catches: caller hung up, call expired, caller started another call
   const startStatusPolling = useCallback((callId) => {
     clearInterval(statusPollRef.current);
     statusPollRef.current = setInterval(async () => {
       try {
         const { data } = await api.get(`${callStatusRoute}/${callId}`);
-        if (["ended", "rejected", "missed"].includes(data.status)) {
-          dismiss();
-        }
-      } catch { /* 404 means call doc gone — also dismiss */ dismiss(); }
+        if (["ended", "rejected", "missed"].includes(data.status)) dismiss();
+      } catch {
+        // 404 = call doc gone (TTL expired or caller cancelled) → dismiss
+        dismiss();
+      }
     }, STATUS_POLL_MS);
   }, [dismiss]);
 
   // ── Poll for new incoming calls ──────────────────────────────────────────────
   const poll = useCallback(async () => {
-    if (activeRef.current) return; // already showing one
+    if (activeRef.current) return;
     try {
       const { data } = await api.get(callIncomingRoute);
       if (data?.callId) {
@@ -79,7 +87,7 @@ export default function IncomingCallBanner({ onAccept, onReject, darkMode }) {
         startRingtone();
         startStatusPolling(data.callId);
       }
-    } catch { /* poll silently */ }
+    } catch { /* silent */ }
   }, [startRingtone, startStatusPolling]);
 
   useEffect(() => {
@@ -106,12 +114,13 @@ export default function IncomingCallBanner({ onAccept, onReject, darkMode }) {
   const handleReject = () => {
     const call = incomingCall;
     dismiss();
-    onReject(call);
+    onReject(call); // parent calls rejectCall(callId) which posts "rejected" to server
   };
 
   if (!incomingCall) return null;
 
   const dm = darkMode;
+  const isVideo = incomingCall.callType === "video";
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
@@ -133,7 +142,7 @@ export default function IncomingCallBanner({ onAccept, onReject, darkMode }) {
           minWidth: 300,
         }}
       >
-        {/* Pulsing avatar ring */}
+        {/* Pulsing avatar */}
         <div className="relative">
           <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping" />
           <div className="absolute inset-[-8px] rounded-full border-2 border-emerald-400/40 animate-pulse" />
@@ -157,8 +166,11 @@ export default function IncomingCallBanner({ onAccept, onReject, darkMode }) {
           <div className={`flex items-center justify-center gap-2 text-xs font-medium mb-1.5 ${
             dm ? "text-emerald-400" : "text-emerald-600"
           }`}>
-            <PhoneIncoming size={13} />
-            <span>Incoming {incomingCall.callType === "video" ? "Video" : "Audio"} Call</span>
+            {isVideo
+              ? <Video size={13} />
+              : <PhoneIncoming size={13} />
+            }
+            <span>Incoming {isVideo ? "Video" : "Audio"} Call</span>
           </div>
           <h2 className={`text-2xl font-bold tracking-tight ${dm ? "text-slate-100" : "text-slate-900"}`}>
             {incomingCall.caller?.username}
@@ -167,7 +179,7 @@ export default function IncomingCallBanner({ onAccept, onReject, darkMode }) {
 
         {/* Buttons */}
         <div className="flex items-center gap-6 mt-2">
-          <button onClick={handleReject} className="flex flex-col items-center gap-2 group">
+          <button onClick={handleReject} className="flex flex-col items-center gap-2">
             <span className="
               flex h-14 w-14 items-center justify-center rounded-full
               bg-red-500 text-white shadow-lg shadow-red-500/40
@@ -178,13 +190,13 @@ export default function IncomingCallBanner({ onAccept, onReject, darkMode }) {
             <span className={`text-xs font-medium ${dm ? "text-slate-400" : "text-slate-500"}`}>Decline</span>
           </button>
 
-          <button onClick={handleAccept} className="flex flex-col items-center gap-2 group">
+          <button onClick={handleAccept} className="flex flex-col items-center gap-2">
             <span className="
               flex h-14 w-14 items-center justify-center rounded-full
               bg-emerald-500 text-white shadow-lg shadow-emerald-500/40
               transition-all duration-200 hover:bg-emerald-400 hover:scale-110 active:scale-95
             ">
-              <Phone size={22} />
+              {isVideo ? <Video size={22} /> : <Phone size={22} />}
             </span>
             <span className={`text-xs font-medium ${dm ? "text-slate-400" : "text-slate-500"}`}>Accept</span>
           </button>
