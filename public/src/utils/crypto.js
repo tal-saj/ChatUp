@@ -1,6 +1,12 @@
 // utils/crypto.js
 // Pure Web Crypto API — no external libraries needed.
 // Uses RSA-OAEP with SHA-256. Keys are stored in localStorage as JWK.
+//
+// KEY PERSISTENCE GUARANTEE:
+//   Once a key pair is generated it is NEVER overwritten.
+//   This ensures messages encrypted with your public key remain decryptable
+//   across sessions, browser restarts, and re-logins.
+//   The only way to lose decryptability is manually clearing localStorage.
 
 const ALGO = {
   name: "RSA-OAEP",
@@ -17,6 +23,7 @@ const LOCAL_PRIVATE_KEY = "chatup-private-key";
 const LOCAL_PUBLIC_KEY  = "chatup-public-key-jwk";
 
 // ── Generate a new RSA key pair and store in localStorage ───────────────────
+// NOTE: call this ONLY when hasKeyPair() returns false.
 export async function generateAndStoreKeyPair() {
   const keyPair = await crypto.subtle.generateKey(ALGO, true, KEY_USAGE_PAIR);
 
@@ -54,17 +61,14 @@ async function importPrivateKey() {
 }
 
 // ── Encrypt a plaintext string with a given JWK public key string ───────────
-// Returns a Base64-encoded ciphertext string.
 export async function encryptMessage(plaintext, recipientPublicKeyJwk) {
   const key       = await importPublicKey(recipientPublicKeyJwk);
   const encoded   = new TextEncoder().encode(plaintext);
   const encrypted = await crypto.subtle.encrypt({ name: "RSA-OAEP" }, key, encoded);
-  // Convert ArrayBuffer → Base64
   return btoa(String.fromCharCode(...new Uint8Array(encrypted)));
 }
 
 // ── Decrypt a Base64 ciphertext string using own private key ─────────────────
-// Returns the plaintext string, or null on failure.
 export async function decryptMessage(base64Ciphertext) {
   try {
     const key       = await importPrivateKey();
@@ -73,6 +77,6 @@ export async function decryptMessage(base64Ciphertext) {
     return new TextDecoder().decode(decrypted);
   } catch (err) {
     console.error("Decryption failed:", err);
-    return null; // Return null so UI can show a placeholder
+    return null;
   }
 }

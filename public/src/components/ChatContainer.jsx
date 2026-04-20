@@ -1,9 +1,7 @@
-// components/ChatContainer.jsx  — UPDATED
-// Only change from original: added CallButton to header, accepts onCall + callDisabled props
-
+// components/ChatContainer.jsx
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import ChatInput from "./ChatInput";
-import CallButton from "./CallButton";                              // ← CALL
+import CallButton from "./CallButton";
 import { Lock } from "lucide-react";
 import { sendMessageRoute, recieveMessageRoute } from "../utils/APIRoutes";
 import { encryptMessage, decryptMessage } from "../utils/crypto";
@@ -13,8 +11,8 @@ export default function ChatContainer({
   currentChat,
   socket,
   darkMode,
-  onCall,          // ← CALL: ({ contact, callType }) => void
-  callDisabled,    // ← CALL: boolean — true while a call is active
+  onCall,
+  callDisabled,
 }) {
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -123,13 +121,18 @@ export default function ChatContainer({
 
   return (
     <div className={`relative flex h-full flex-col transition-colors duration-300 ${
-      dm ? "bg-slate-900" : "bg-gradient-to-b from-slate-50 via-slate-100 to-white"
+      dm
+        ? "bg-[#0f172a]"                          // deep navy — clearly different from slate-900 sidebar
+        : "bg-gradient-to-br from-blue-50/60 via-slate-50 to-indigo-50/40" // soft cool tint vs white sidebar
     }`}>
 
       {/* Header */}
       <header className={`
         sticky top-0 z-10 px-4 py-3.5 flex items-center justify-between border-b transition-colors duration-300
-        ${dm ? "bg-slate-800/90 border-slate-700/60" : "bg-white/70 backdrop-blur-2xl border-slate-200/70 shadow-sm"}
+        ${dm
+          ? "bg-slate-800/95 border-slate-700/60 shadow-sm shadow-black/20"
+          : "bg-white/90 backdrop-blur-2xl border-slate-200/70 shadow-sm"
+        }
       `}>
         <div className="flex items-center gap-3.5">
           <div className="relative">
@@ -161,21 +164,20 @@ export default function ChatContainer({
           </div>
         </div>
 
-        {/* Right side: Call button + E2E badge */}
+        {/* Right: call button + E2E badge */}
         <div className="flex items-center gap-2">
-          {/* ← CALL: CallButton sits here */}
           <CallButton
             contact={currentChat}
             onCall={() => onCall?.({ contact: currentChat, callType: "audio" })}
             darkMode={dm}
             disabled={callDisabled}
           />
-
           <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
             dm ? "bg-emerald-900/40 text-emerald-400" : "bg-emerald-50 text-emerald-700 border border-emerald-200"
           }`}>
             <Lock size={11} />
-            <span>End-to-end encrypted</span>
+            <span className="hidden sm:inline">End-to-end encrypted</span>
+            <span className="sm:hidden">E2E</span>
           </div>
         </div>
       </header>
@@ -183,7 +185,9 @@ export default function ChatContainer({
       {/* E2E info banner */}
       {!isLoading && (
         <div className={`mx-4 mt-4 mb-1 flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-xs ${
-          dm ? "bg-slate-800/60 text-slate-500 border border-slate-700/40" : "bg-slate-100/80 text-slate-400 border border-slate-200"
+          dm
+            ? "bg-slate-800/60 text-slate-500 border border-slate-700/40"
+            : "bg-white/70 text-slate-400 border border-slate-200/70"
         }`}>
           <Lock size={10} />
           <span>Messages are end-to-end encrypted. Only you and {currentChat?.username} can read them.</span>
@@ -218,12 +222,14 @@ export default function ChatContainer({
                 style={{ animation: "fadeSlideIn 0.2s ease-out forwards" }}
               >
                 <div className={`
-                  max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed shadow-sm
+                  max-w-[78%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed shadow-sm
                   ${isSent
-                    ? dm ? "bg-indigo-600 text-white rounded-br-sm"
-                         : "bg-gradient-to-br from-slate-700 to-slate-900 text-white rounded-br-sm"
-                    : dm ? "bg-slate-700/80 text-slate-100 rounded-bl-sm border border-slate-600/50"
-                         : "bg-white/80 backdrop-blur-sm border border-slate-200/80 text-slate-800 rounded-bl-sm"
+                    ? dm
+                      ? "bg-indigo-600 text-white rounded-br-sm shadow-indigo-900/30"
+                      : "bg-gradient-to-br from-slate-700 to-slate-900 text-white rounded-br-sm"
+                    : dm
+                      ? "bg-slate-700/70 text-slate-100 rounded-bl-sm border border-slate-600/40"
+                      : "bg-white/90 backdrop-blur-sm border border-slate-200/80 text-slate-800 rounded-bl-sm shadow-slate-200/60"
                   }
                   ${msg.optimistic ? "opacity-70" : ""}
                 `}>
@@ -244,7 +250,9 @@ export default function ChatContainer({
 
       {/* Input */}
       <div className={`p-3 pb-[env(safe-area-inset-bottom,12px)] border-t transition-colors duration-300 ${
-        dm ? "border-slate-700/60 bg-slate-800/50" : "border-slate-200/60"
+        dm
+          ? "border-slate-700/60 bg-slate-800/60"
+          : "border-slate-200/60 bg-white/60 backdrop-blur-sm"
       }`}>
         <ChatInput handleSendMsg={handleSendMsg} darkMode={dm} />
       </div>

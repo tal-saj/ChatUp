@@ -1,7 +1,4 @@
-// pages/Chat.jsx  — FULL UPDATED FILE
-// Changes from original: added IncomingCallBanner, ActiveCall, useWebRTC integration
-// Search "// ← CALL" to find every new line
-
+// pages/Chat.jsx
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { allUsersRoute, uploadKeyRoute, heartbeatRoute, unreadCountsRoute } from "../utils/APIRoutes";
@@ -9,9 +6,9 @@ import { generateAndStoreKeyPair, hasKeyPair, getStoredPublicKeyJwk } from "../u
 import ChatContainer from "../components/ChatContainer";
 import Contacts from "../components/Contacts";
 import Welcome from "../components/Welcome";
-import IncomingCallBanner from "../components/IncomingCallBanner"; // ← CALL
-import ActiveCall from "../components/ActiveCall";                 // ← CALL
-import { useWebRTC } from "../hooks/useWebRTC";                    // ← CALL
+import IncomingCallBanner from "../components/IncomingCallBanner";
+import ActiveCall from "../components/ActiveCall";
+import { useWebRTC } from "../hooks/useWebRTC";
 import api from "../utils/axiosConfig";
 
 const isOnline = (lastSeen) => {
@@ -33,10 +30,13 @@ export default function Chat() {
   const [unreadCounts, setUnreadCounts] = useState({});
   const [unreadSince, setUnreadSince] = useState(new Date().toISOString());
 
-  // ── Call state ── ← CALL
-  const [activeCall, setActiveCall]         = useState(null);  // { contact, callType }
-  const [remoteStream, setRemoteStream]     = useState(null);
-  const [callActive, setCallActive]         = useState(false); // is a call in progress?
+  // Mobile: "contacts" | "chat"
+  const [mobileView, setMobileView] = useState("contacts");
+
+  // Call state
+  const [activeCall, setActiveCall]     = useState(null);
+  const [remoteStream, setRemoteStream] = useState(null);
+  const [callActive, setCallActive]     = useState(false);
 
   const [darkMode, setDarkMode] = useState(() =>
     localStorage.getItem("chatup-theme") === "dark"
@@ -50,57 +50,54 @@ export default function Chat() {
     });
   };
 
-  // ── WebRTC hook ── ← CALL
+  // ── WebRTC hook ──────────────────────────────────────────────────────────
   const { startCall, acceptCall, rejectCall, hangup, setMuted } = useWebRTC({
     onRemoteStream: (stream) => setRemoteStream(stream),
-    onCallEnded: (reason) => {
+    onCallEnded: () => {
       setActiveCall(null);
       setRemoteStream(null);
       setCallActive(false);
     },
   });
 
-  // ── Handle outgoing call ── ← CALL
   const handleStartCall = useCallback(async ({ contact, callType = "audio" }) => {
-    if (callActive) return; // already in a call
+    if (callActive) return;
     try {
       await startCall({ calleeId: contact._id, callType });
       setActiveCall({ contact, callType });
       setCallActive(true);
     } catch (err) {
-      const msg = err?.name === "NotAllowedError"
-        ? "Microphone access was denied. Please allow it in your browser settings."
-        : "Could not start the call. Please try again.";
-      alert(msg);
+      alert(
+        err?.name === "NotAllowedError"
+          ? "Microphone access denied. Please allow it in browser settings."
+          : "Could not start the call. Please try again."
+      );
     }
   }, [callActive, startCall]);
 
-  // ── Handle incoming call accepted ── ← CALL
   const handleAcceptCall = useCallback(async (incomingCall) => {
     if (callActive) return;
-    const contact = incomingCall.caller;
     try {
       await acceptCall({
         callId: incomingCall.callId,
         offer: incomingCall.offer,
         callType: incomingCall.callType,
       });
-      setActiveCall({ contact, callType: incomingCall.callType });
+      setActiveCall({ contact: incomingCall.caller, callType: incomingCall.callType });
       setCallActive(true);
     } catch (err) {
-      const msg = err?.name === "NotAllowedError"
-        ? "Microphone access was denied. Please allow it in your browser settings."
-        : "Could not accept the call. Please try again.";
-      alert(msg);
+      alert(
+        err?.name === "NotAllowedError"
+          ? "Microphone access denied. Please allow it in browser settings."
+          : "Could not accept the call. Please try again."
+      );
     }
   }, [callActive, acceptCall]);
 
-  // ── Handle incoming call rejected ── ← CALL
   const handleRejectCall = useCallback(async (incomingCall) => {
     await rejectCall(incomingCall.callId);
   }, [rejectCall]);
 
-  // ── Handle hang up ── ← CALL
   const handleHangup = useCallback(async () => {
     await hangup("ended");
     setActiveCall(null);
@@ -108,7 +105,7 @@ export default function Chat() {
     setCallActive(false);
   }, [hangup]);
 
-  // ── 1. Load current user ────────────────────────────────────────────────
+  // ── 1. Load current user ─────────────────────────────────────────────────
   useEffect(() => {
     const userData = localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY);
     if (!userData) { navigate("/login"); return; }
@@ -126,42 +123,71 @@ export default function Chat() {
     }
   }, [navigate]);
 
-  // ── 2. E2E key setup + fetch contacts ──────────────────────────────────
+  // ── 2. Key setup — NEVER regenerate if key already exists ────────────────
+  // Root cause of "unable to decrypt": if we regenerate the key pair,
+  // the new public key gets uploaded, old messages can't be decrypted.
+  // Fix: generate once, upload the same stored key on every login.
   useEffect(() => {
     if (!currentUser) return;
+
     const setup = async () => {
       setIsLoading(true);
-      if (!currentUser.isAvatarImageSet) { navigate("/setAvatar"); return; }
+
+      if (!currentUser.isAvatarImageSet) {
+        navigate("/setAvatar");
+        return;
+      }
+
+      // Step 1: ensure we have a local key pair (generate only if missing)
+      let publicKeyToUpload;
       if (!hasKeyPair()) {
-        try {
-          const { publicJwk } = await generateAndStoreKeyPair();
-          await api.post(uploadKeyRoute, { userId: currentUser._id, publicKey: JSON.stringify(publicJwk) });
-        } catch (err) { console.error("Key generation failed:", err); }
+        // First time on this device/browser — generate fresh keys
+        const { publicJwk } = await generateAndStoreKeyPair();
+        publicKeyToUpload = JSON.stringify(publicJwk);
       } else {
-        const stored = getStoredPublicKeyJwk();
-        if (stored) {
-          await api.post(uploadKeyRoute, { userId: currentUser._id, publicKey: stored }).catch(() => {});
+        // Keys already exist — reuse them, just re-upload to keep server in sync
+        publicKeyToUpload = getStoredPublicKeyJwk();
+      }
+
+      // Step 2: upload (or re-confirm) public key to server
+      if (publicKeyToUpload) {
+        try {
+          await api.post(uploadKeyRoute, {
+            userId: currentUser._id,
+            publicKey: publicKeyToUpload,
+          });
+        } catch (err) {
+          console.error("Key upload failed:", err);
+          // Non-fatal — existing key on server may still work
         }
       }
+
+      // Step 3: load contacts
       try {
         const { data } = await api.get(`${allUsersRoute}/${currentUser._id}`);
         setContacts(data || []);
-      } catch (err) { console.error("Failed to load contacts:", err); }
-      finally { setIsLoading(false); }
+      } catch (err) {
+        console.error("Failed to load contacts:", err);
+      } finally {
+        setIsLoading(false);
+      }
     };
+
     setup();
   }, [currentUser, navigate]);
 
-  // ── 3. Heartbeat ─────────────────────────────────────────────────────
+  // ── 3. Heartbeat every 30s ───────────────────────────────────────────────
   useEffect(() => {
     if (!currentUser) return;
-    const beat = () => api.post(heartbeatRoute, { userId: currentUser._id }).catch(() => {});
+    const beat = () =>
+      api.post(heartbeatRoute, { userId: currentUser._id }).catch(() => {});
     beat();
     heartbeatTimer.current = setInterval(beat, 30_000);
     return () => clearInterval(heartbeatTimer.current);
   }, [currentUser]);
 
-  // ── 4. Refresh contacts every 35s ────────────────────────────────────
+  // ── 4. Contacts refresh every 10s (was 35s) ──────────────────────────────
+  // Reduced to 10s so online badges update within ~10s of someone connecting.
   const refreshContacts = useCallback(async () => {
     if (!currentUser) return;
     try {
@@ -172,11 +198,11 @@ export default function Chat() {
 
   useEffect(() => {
     if (!currentUser) return;
-    contactsRefreshTimer.current = setInterval(refreshContacts, 35_000);
+    contactsRefreshTimer.current = setInterval(refreshContacts, 10_000);
     return () => clearInterval(contactsRefreshTimer.current);
   }, [currentUser, refreshContacts]);
 
-  // ── 5. Unread message polling ─────────────────────────────────────────
+  // ── 5. Unread counts every 5s ────────────────────────────────────────────
   useEffect(() => {
     if (!currentUser) return;
     const fetchUnread = async () => {
@@ -210,14 +236,14 @@ export default function Chat() {
     return () => clearInterval(unreadTimer.current);
   }, [currentUser, contacts, unreadSince]);
 
-  // ── 6. Notification permission ───────────────────────────────────────
+  // ── 6. Notification permission ───────────────────────────────────────────
   useEffect(() => {
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
   }, []);
 
-  // ── 7. Inactivity logout ─────────────────────────────────────────────
+  // ── 7. Inactivity logout at 30min ────────────────────────────────────────
   useEffect(() => {
     if (!currentUser) return;
     const TIMEOUT = 30 * 60 * 1000;
@@ -238,9 +264,11 @@ export default function Chat() {
     };
   }, [currentUser, navigate]);
 
-  // ── Handlers ──────────────────────────────────────────────────────────
+  // ── Chat change handler ───────────────────────────────────────────────────
   const handleChatChange = (chat) => {
     setCurrentChat(chat);
+    // Refresh contacts immediately so online status is current
+    refreshContacts();
     if (chat?._id) {
       setUnreadCounts((prev) => {
         const next = { ...prev };
@@ -248,8 +276,16 @@ export default function Chat() {
         return next;
       });
     }
+    // On mobile, switch to chat view
+    setMobileView("chat");
   };
 
+  const handleMobileBack = () => {
+    setMobileView("contacts");
+    setCurrentChat(undefined);
+  };
+
+  // ── Loading screen ────────────────────────────────────────────────────────
   if (isLoading || !currentUser) {
     return (
       <div className={`fixed inset-0 flex items-center justify-center ${darkMode ? "bg-slate-900" : "bg-slate-50"}`}>
@@ -273,7 +309,7 @@ export default function Chat() {
       darkMode ? "bg-slate-950" : "bg-gradient-to-br from-slate-100 via-slate-50 to-white"
     }`}>
 
-      {/* ── Incoming call banner (global, always mounted) ── ← CALL */}
+      {/* Incoming call banner */}
       {!callActive && (
         <IncomingCallBanner
           onAccept={handleAcceptCall}
@@ -282,7 +318,7 @@ export default function Chat() {
         />
       )}
 
-      {/* ── Active call overlay ── ← CALL */}
+      {/* Active call overlay */}
       {callActive && activeCall && (
         <ActiveCall
           contact={activeCall.contact}
@@ -296,16 +332,19 @@ export default function Chat() {
 
       <div className={`
         relative flex w-full max-w-[1800px] mx-auto h-full
-        shadow-2xl rounded-2xl overflow-hidden transition-all duration-500
+        shadow-2xl overflow-hidden transition-all duration-500
+        md:rounded-2xl
         ${darkMode
           ? "border border-slate-700/50 bg-slate-900 shadow-black/40"
           : "border border-slate-200/70 bg-white/60 backdrop-blur-xl shadow-slate-300/40"
         }
       `}>
-        {/* Sidebar */}
+
+        {/* ── DESKTOP LAYOUT ────────────────────────────────────────────────── */}
+        {/* Sidebar — hidden on mobile */}
         <aside className={`
-          hidden md:block md:w-80 lg:w-96 flex-shrink-0
-          border-r overflow-y-auto transition-all duration-300
+          hidden md:flex md:w-80 lg:w-96 flex-shrink-0 flex-col
+          border-r transition-all duration-300
           ${darkMode ? "border-slate-700/50" : "border-slate-200/60"}
         `}>
           <Contacts
@@ -317,75 +356,126 @@ export default function Chat() {
           />
         </aside>
 
-        {/* Main */}
-        <main className={`flex-1 flex flex-col min-w-0 transition-colors duration-300 ${
-          darkMode ? "bg-slate-900/50" : "bg-white/30 backdrop-blur-md"
+        {/* Main chat area — hidden on mobile */}
+        <main className={`hidden md:flex flex-1 flex-col min-w-0 transition-colors duration-300 ${
+          darkMode
+            ? "bg-slate-900/50"
+            : "bg-gradient-to-br from-blue-50/40 via-slate-50 to-indigo-50/30"
         }`}>
-          {/* Mobile header */}
-          <div className={`
-            md:hidden sticky top-0 z-20 px-4 py-3.5 flex items-center gap-3.5 border-b transition-colors duration-300
-            ${darkMode ? "bg-slate-800/90 border-slate-700/60" : "bg-white/70 backdrop-blur-2xl border-slate-200/60 shadow-sm"}
-          `}>
-            {currentChat && (
-              <button onClick={() => setCurrentChat(undefined)}
-                className={`p-2.5 rounded-full transition-all ${darkMode ? "hover:bg-slate-700 text-slate-300" : "hover:bg-slate-100 text-slate-600"}`}>
+          {currentChat === undefined ? (
+            <Welcome darkMode={darkMode} />
+          ) : (
+            <ChatContainer
+              currentChat={currentChat}
+              socket={socket}
+              darkMode={darkMode}
+              onCall={handleStartCall}
+              callDisabled={callActive}
+            />
+          )}
+        </main>
+
+        {/* ── MOBILE LAYOUT ─────────────────────────────────────────────────── */}
+        {/* Mobile: Contacts view */}
+        <div className={`
+          md:hidden absolute inset-0 flex flex-col
+          transition-transform duration-300 ease-in-out
+          ${mobileView === "contacts" ? "translate-x-0" : "-translate-x-full"}
+        `}>
+          <Contacts
+            contacts={contactsWithStatus}
+            changeChat={handleChatChange}
+            darkMode={darkMode}
+            toggleDarkMode={toggleDarkMode}
+            unreadCounts={unreadCounts}
+          />
+        </div>
+
+        {/* Mobile: Chat view */}
+        <div className={`
+          md:hidden absolute inset-0 flex flex-col
+          transition-transform duration-300 ease-in-out
+          ${mobileView === "chat" ? "translate-x-0" : "translate-x-full"}
+          ${darkMode
+            ? "bg-slate-900"
+            : "bg-gradient-to-br from-blue-50/40 via-slate-50 to-indigo-50/30"
+          }
+        `}>
+          {/* Mobile chat header — back button */}
+          {currentChat && (
+            <div className={`
+              flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b transition-colors
+              ${darkMode
+                ? "bg-slate-800/90 border-slate-700/60"
+                : "bg-white/80 backdrop-blur-xl border-slate-200/60 shadow-sm"
+              }
+            `}>
+              <button
+                onClick={handleMobileBack}
+                className={`p-2 rounded-full transition-all hover:scale-105 active:scale-95 ${
+                  darkMode ? "hover:bg-slate-700 text-slate-300" : "hover:bg-slate-100 text-slate-600"
+                }`}
+              >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
-            )}
-            {currentChat ? (
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <div className="relative">
-                  <div className="h-9 w-9 rounded-full overflow-hidden flex-shrink-0">
-                    <img src={`data:image/svg+xml;base64,${currentChat.avatarImage}`} alt={currentChat.username} className="h-full w-full object-cover" />
-                  </div>
-                  {currentChat.online && (
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />
-                  )}
-                </div>
-                <h2 className={`font-semibold truncate ${darkMode ? "text-slate-100" : "text-slate-800"}`}>{currentChat.username}</h2>
-              </div>
-            ) : (
-              <h2 className={`font-semibold text-lg ${darkMode ? "text-slate-100" : "text-slate-800"}`}>Messages</h2>
-            )}
-            <button onClick={toggleDarkMode}
-              className={`ml-auto p-2 rounded-full transition-all ${darkMode ? "bg-slate-700 text-yellow-400" : "bg-slate-100 text-slate-600"}`}>
-              {darkMode
-                ? <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0V4a1 1 0 0 1 1-1zm0 15a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0v-1a1 1 0 0 1 1-1zm9-7a1 1 0 0 1-1 1h-1a1 1 0 1 1 0-2h1a1 1 0 0 1 1 1zM4 12a1 1 0 0 1-1 1H2a1 1 0 1 1 0-2h1a1 1 0 0 1 1 1zm14.95 5.657a1 1 0 0 1-1.414 0l-.707-.707a1 1 0 0 1 1.414-1.414l.707.707a1 1 0 0 1 0 1.414zM6.464 6.464a1 1 0 0 1-1.414 0l-.707-.707A1 1 0 0 1 5.757 4.343l.707.707a1 1 0 0 1 0 1.414zm12.143-1.414a1 1 0 0 1 0 1.414l-.707.707a1 1 0 0 1-1.414-1.414l.707-.707a1 1 0 0 1 1.414 0zM6.464 17.536a1 1 0 0 1 0 1.414l-.707.707a1 1 0 0 1-1.414-1.414l.707-.707a1 1 0 0 1 1.414 0zM12 7a5 5 0 1 0 0 10A5 5 0 0 0 12 7z"/></svg>
-                : <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>
-              }
-            </button>
-          </div>
 
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className="relative flex-shrink-0">
+                  <div className="h-9 w-9 rounded-full overflow-hidden">
+                    <img
+                      src={`data:image/svg+xml;base64,${currentChat.avatarImage}`}
+                      alt={currentChat.username}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ${
+                    currentChat.online
+                      ? darkMode ? "bg-emerald-500 ring-slate-800" : "bg-emerald-500 ring-white"
+                      : darkMode ? "bg-slate-600 ring-slate-800" : "bg-slate-300 ring-white"
+                  }`} />
+                </div>
+                <div className="min-w-0">
+                  <h2 className={`font-semibold truncate text-sm ${darkMode ? "text-slate-100" : "text-slate-800"}`}>
+                    {currentChat.username}
+                  </h2>
+                  <p className={`text-xs ${currentChat.online ? "text-emerald-500" : darkMode ? "text-slate-500" : "text-slate-400"}`}>
+                    {currentChat.online ? "Online" : "Offline"}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={toggleDarkMode}
+                className={`flex-shrink-0 p-2 rounded-full transition-all ${
+                  darkMode ? "bg-slate-700 text-yellow-400" : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                {darkMode
+                  ? <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0V4a1 1 0 0 1 1-1zm0 15a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0v-1a1 1 0 0 1 1-1zm9-7a1 1 0 0 1-1 1h-1a1 1 0 1 1 0-2h1a1 1 0 0 1 1 1zM4 12a1 1 0 0 1-1 1H2a1 1 0 1 1 0-2h1a1 1 0 0 1 1 1zm14.95 5.657a1 1 0 0 1-1.414 0l-.707-.707a1 1 0 0 1 1.414-1.414l.707.707a1 1 0 0 1 0 1.414zM6.464 6.464a1 1 0 0 1-1.414 0l-.707-.707A1 1 0 0 1 5.757 4.343l.707.707a1 1 0 0 1 0 1.414zm12.143-1.414a1 1 0 0 1 0 1.414l-.707.707a1 1 0 0 1-1.414-1.414l.707-.707a1 1 0 0 1 1.414 0zM6.464 17.536a1 1 0 0 1 0 1.414l-.707.707a1 1 0 0 1-1.414-1.414l.707-.707a1 1 0 0 1 1.414 0zM12 7a5 5 0 1 0 0 10A5 5 0 0 0 12 7z"/></svg>
+                  : <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>
+                }
+              </button>
+            </div>
+          )}
+
+          {/* Chat content fills remaining space */}
           <div className="flex-1 overflow-hidden">
-            {currentChat === undefined ? (
-              <Welcome darkMode={darkMode} />
-            ) : (
+            {currentChat ? (
               <ChatContainer
                 currentChat={currentChat}
                 socket={socket}
                 darkMode={darkMode}
-                onNewMessage={() => {}}
-                onCall={handleStartCall}  // ← CALL: pass down to header
-                callDisabled={callActive} // ← CALL: disable button during active call
+                onCall={handleStartCall}
+                callDisabled={callActive}
               />
+            ) : (
+              <Welcome darkMode={darkMode} />
             )}
           </div>
-        </main>
+        </div>
       </div>
-
-      {/* Mobile FAB */}
-      <button
-        className={`md:hidden fixed bottom-6 right-6 z-40 p-4 rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all duration-300 ${
-          darkMode ? "bg-indigo-600 text-white" : "bg-gradient-to-br from-slate-700 to-slate-900 text-white"
-        }`}
-        onClick={() => setCurrentChat(undefined)}
-      >
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M4 6h16M4 12h16M4 18h7" />
-        </svg>
-      </button>
     </div>
   );
 }

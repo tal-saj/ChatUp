@@ -1,10 +1,10 @@
-// Contacts.jsx
+// components/Contacts.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Users } from "lucide-react";
 import Logo from "../assets/logo.svg";
 import Logout from "./Logout";
-import axios from "axios";
+import api from "../utils/axiosConfig";
 import { friendRequestsRoute } from "../utils/APIRoutes";
 
 export default function Contacts({ contacts, changeChat, darkMode, toggleDarkMode, unreadCounts = {} }) {
@@ -29,23 +29,17 @@ export default function Contacts({ contacts, changeChat, darkMode, toggleDarkMod
     return () => clearTimeout(t);
   }, []);
 
-  // Poll for pending friend requests to show badge on Friends button
+  // Poll for pending friend requests every 10s (was 30s)
   useEffect(() => {
     const fetchPendingCount = async () => {
       try {
-        const stored = localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY);
-        const user = stored ? JSON.parse(stored) : null;
-        if (!user?.token) return;
-
-        const { data } = await axios.get(friendRequestsRoute, {
-          headers: { Authorization: `Bearer ${user.token}` },
-        });
+        const { data } = await api.get(friendRequestsRoute);
         setPendingRequestCount(Array.isArray(data) ? data.length : 0);
       } catch {}
     };
 
-    fetchPendingCount();
-    const timer = setInterval(fetchPendingCount, 30_000);
+    fetchPendingCount(); // immediate on mount
+    const timer = setInterval(fetchPendingCount, 10_000);
     return () => clearInterval(timer);
   }, []);
 
@@ -66,11 +60,13 @@ export default function Contacts({ contacts, changeChat, darkMode, toggleDarkMod
   }
 
   return (
-    <div className={`flex h-full flex-col transition-colors duration-300 ${darkMode ? "bg-slate-900" : "bg-gradient-to-b from-slate-50 via-slate-100 to-white"}`}>
+    <div className={`flex h-full flex-col transition-colors duration-300 ${
+      darkMode ? "bg-slate-900" : "bg-white"
+    }`}>
 
       {/* Header */}
       <div className={`shrink-0 flex items-center gap-3 py-4 px-4 border-b transition-colors duration-300 ${
-        darkMode ? "border-slate-700/60 bg-slate-800/80" : "border-slate-200/70 bg-white/60 backdrop-blur-xl shadow-sm"
+        darkMode ? "border-slate-700/60 bg-slate-800/80" : "border-slate-200/70 bg-white shadow-sm"
       }`}>
         <img src={Logo} alt="ChatUp" className="h-7 w-auto drop-shadow-sm transition-transform hover:scale-105" />
         <h3 className={`text-lg font-bold tracking-tight flex-1 ${darkMode ? "text-slate-100" : "text-slate-800"}`}>ChatUp</h3>
@@ -138,8 +134,12 @@ export default function Contacts({ contacts, changeChat, darkMode, toggleDarkMod
               className={`
                 group flex items-center gap-3.5 px-4 py-3 rounded-xl cursor-pointer transition-colors duration-150
                 ${isSelected
-                  ? darkMode ? "bg-slate-700 border border-slate-600/80 shadow-md" : "bg-white border border-slate-300/80 shadow-md shadow-slate-400/20"
-                  : darkMode ? "hover:bg-slate-800/70" : "hover:bg-white/80 hover:shadow-sm"
+                  ? darkMode
+                    ? "bg-slate-700 border border-slate-600/80 shadow-md"
+                    : "bg-slate-100 border border-slate-200/80 shadow-sm"
+                  : darkMode
+                    ? "hover:bg-slate-800/70"
+                    : "hover:bg-slate-50"
                 }
                 focus:outline-none focus:ring-2 focus:ring-slate-400/40
               `}
@@ -148,8 +148,8 @@ export default function Contacts({ contacts, changeChat, darkMode, toggleDarkMod
               <div className="relative flex-shrink-0">
                 <div className={`h-11 w-11 rounded-full overflow-hidden ring-2 transition-all duration-200 ${
                   isSelected
-                    ? darkMode ? "ring-indigo-400 ring-offset-2 ring-offset-slate-700" : "ring-slate-500 ring-offset-2 ring-offset-white"
-                    : darkMode ? "ring-slate-600" : "ring-slate-300/60 group-hover:ring-slate-400"
+                    ? darkMode ? "ring-indigo-400 ring-offset-2 ring-offset-slate-700" : "ring-slate-400 ring-offset-2 ring-offset-white"
+                    : darkMode ? "ring-slate-600" : "ring-slate-200 group-hover:ring-slate-300"
                 }`}>
                   <img
                     src={`data:image/svg+xml;base64,${contact.avatarImage}`}
@@ -158,8 +158,7 @@ export default function Contacts({ contacts, changeChat, darkMode, toggleDarkMod
                     onError={(e) => (e.target.src = "/fallback-avatar.png")}
                   />
                 </div>
-                {/* Online/Offline indicator */}
-                <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full ring-2 transition-colors duration-500 ${
+                <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full ring-2 transition-colors duration-300 ${
                   contact.online
                     ? "bg-emerald-500 ring-white"
                     : darkMode ? "bg-slate-600 ring-slate-700" : "bg-slate-300 ring-white"
@@ -176,9 +175,7 @@ export default function Contacts({ contacts, changeChat, darkMode, toggleDarkMod
                   {contact.username}
                 </h3>
                 <p className={`text-xs font-medium ${
-                  contact.online
-                    ? "text-emerald-500"
-                    : darkMode ? "text-slate-600" : "text-slate-400"
+                  contact.online ? "text-emerald-500" : darkMode ? "text-slate-600" : "text-slate-400"
                 }`}>
                   {contact.online ? "Online" : "Offline"}
                 </p>
@@ -186,7 +183,7 @@ export default function Contacts({ contacts, changeChat, darkMode, toggleDarkMod
 
               {/* Unread badge */}
               {unread > 0 && (
-                <span className="flex-shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white animate-bounce">
+                <span className="flex-shrink-0 flex h-5 min-w-[20px] px-1 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
                   {unread > 9 ? "9+" : unread}
                 </span>
               )}
@@ -197,19 +194,19 @@ export default function Contacts({ contacts, changeChat, darkMode, toggleDarkMod
 
       {/* Current user bar */}
       <div className={`shrink-0 border-t px-4 py-3.5 flex items-center gap-3 transition-colors duration-300 ${
-        darkMode ? "border-slate-700/60 bg-slate-800/80" : "border-slate-200/70 bg-white/70 backdrop-blur-xl shadow-sm"
+        darkMode ? "border-slate-700/60 bg-slate-800/80" : "border-slate-200/70 bg-white shadow-sm"
       }`}>
         <div className="relative">
           <div className="h-10 w-10 rounded-full overflow-hidden ring-2 ring-slate-400/50 ring-offset-1 flex-shrink-0">
             <img src={`data:image/svg+xml;base64,${currentUserImage}`} alt="Your avatar" className="h-full w-full object-cover" />
           </div>
-          {/* Self is always shown as online since we're in the app */}
           <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />
         </div>
         <div className="min-w-0 flex-1">
           <h2 className={`font-semibold truncate text-sm ${darkMode ? "text-slate-100" : "text-slate-900"}`}>{currentUserName}</h2>
           <p className="text-xs font-medium text-emerald-500">Online</p>
         </div>
+        {/* Pass darkMode so Logout button can style itself correctly */}
         <Logout darkMode={darkMode} />
       </div>
     </div>
