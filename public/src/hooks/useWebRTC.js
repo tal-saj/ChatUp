@@ -1,8 +1,4 @@
 // hooks/useWebRTC.js
-// Encapsulates all RTCPeerConnection logic.
-// Designed to work with REST polling as the signaling transport.
-// Video-ready: just pass callType="video" and a localVideoRef to upgrade later.
-
 import { useRef, useCallback } from "react";
 import api from "../utils/axiosConfig";
 import {
@@ -14,9 +10,6 @@ import {
   callEndRoute,
 } from "../utils/APIRoutes";
 
-// ── ICE server config ─────────────────────────────────────────────────────────
-// Google STUN (free, unlimited) + Open Relay TURN (free 50GB/mo tier).
-// Swap openrelay credentials for your own Metered.ca key in production.
 const ICE_SERVERS = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
@@ -33,9 +26,6 @@ const ICE_SERVERS = [
   },
 ];
 
-// ── Audio quality constraints ─────────────────────────────────────────────────
-// echoCancellation + noiseSuppression dramatically improve call quality.
-// When adding video, merge { video: { width: 1280, height: 720, frameRate: 30 } }
 const AUDIO_CONSTRAINTS = {
   audio: {
     echoCancellation: true,
@@ -47,56 +37,95 @@ const AUDIO_CONSTRAINTS = {
 };
 
 const VIDEO_CONSTRAINTS = {
-  audio: {
-    echoCancellation: true,
-    noiseSuppression: true,
-    autoGainControl: true,
-  },
-  video: {
-    width: { ideal: 1280 },
-    height: { ideal: 720 },
-    frameRate: { ideal: 30, max: 30 },
-  },
+  audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+  video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } },
 };
 
-// ── Polling intervals ─────────────────────────────────────────────────────────
-const CANDIDATE_POLL_MS  = 1_000; // poll ICE candidates every 1s during setup
-const STATUS_POLL_MS     = 1_500; // poll for answer every 1.5s
-const CANDIDATE_DRAIN_MS = 500;   // check for remaining candidates after connection
+const CANDIDATE_POLL_MS  = 1_000;
+const STATUS_POLL_MS     = 1_500;
+const CANDIDATE_DRAIN_MS = 500;
 
 export function useWebRTC({ onCallEnded, onRemoteStream }) {
-  const pcRef            = useRef(null);  // RTCPeerConnection
-  const localStreamRef   = useRef(null);  // our mic/camera stream
-  const callIdRef        = useRef(null);  // current call ID
-  const roleRef          = useRef(null);  // "caller" | "callee"
-  const callTypeRef      = useRef(null);  // "audio" | "video"
-  const statusPollRef    = useRef(null);  // setInterval for answer polling
-  const candidatePollRef = useRef(null);  // setInterval for ICE candidate polling
-  const seenCandidates   = useRef(new Set()); // dedupe candidates
+  const pcRef            = useRef(null);
+  const localStreamRef   = useRef(null);
+  const callIdRef        = useRef(null);
+  const roleRef          = useRef(null);
+  const callTypeRef      = useRef(null);
+  const statusPollRef    = useRef(null);
+  const candidatePollRef = useRef(null);
+  const seenCandidates   = useRef(new Set());
 
-   // ── Internal cleanup ─────────────────────────────────────────────────────────
-  const cleanup = useCallback(async () => {
+  // ── Guard against double-hangup (concurrent ICE failure + manual hang up) ──
+  const hangingUpRef = useRef(false);
+
+  // ── Store callbacks in refs so closures inside createPeerConnection are stable
+  const onCallEndedRef   = useRef(onCallEnded);
+  const onRemoteStreamRef = useRef(onRemoteStream);
+  onCallEndedRef.current   = onCallEnded;
+  onRemoteStreamRef.current = onRemoteStream;
+
+  // ── Internal cleanup ────────────────────────────────────────────────────────
+  const cleanup = useCallback(() => {
     clearInterval(statusPollRef.current);
     clearInterval(candidatePollRef.current);
+    statusPollRef.current    = null;
+    candidatePollRef.current = null;
 
-    // Stop all local media tracks (releases mic/camera indicator)
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     localStreamRef.current = null;
 
-    // Close peer connection
     pcRef.current?.close();
     pcRef.current = null;
 
-    callIdRef.current = null;
-    roleRef.current = null;
+    callIdRef.current     = null;
+    roleRef.current       = null;
+    callTypeRef.current   = null;
+    hangingUpRef.current  = false;
     seenCandidates.current = new Set();
   }, []);
 
-  // ── Build RTCPeerConnection with all event handlers ─────────────────────────
+  // ── One-shot drain of remaining candidates ──────────────────────────────────
+  const drainCandidates = useCallback(async () => {
+    if (!callIdRef.current || !pcRef.current) return;
+    try {
+      const { data } = await api.get(
+        `${callCandidatesRoute}/${callIdRef.current}?role=${roleRef.current}`
+      );
+      for (const raw of data.candidates ?? []) {
+        if (seenCandidates.current.has(raw)) continue;
+        seenCandidates.current.add(raw);
+        try {
+          await pcRef.current.addIceCandidate(new RTCIceCandidate(JSON.parse(raw)));
+        } catch { /* stale */ }
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  // ── Hang up — safe to call multiple times ───────────────────────────────────
+  const hangup = useCallback(async (reason = "ended") => {
+    if (hangingUpRef.current) return; // already hanging up
+    hangingUpRef.current = true;
+
+    const id = callIdRef.current;
+    cleanup();
+
+    if (id) {
+      try { await api.post(callEndRoute, { callId: id, reason }); } catch { /* ignore */ }
+    }
+    onCallEndedRef.current?.(reason);
+  }, [cleanup]);
+
+  // ── Build RTCPeerConnection ──────────────────────────────────────────────────
+  // Uses refs for hangup/drainCandidates so event handlers always have
+  // the latest version regardless of when they fire.
+  const hangupRef       = useRef(hangup);
+  const drainRef        = useRef(drainCandidates);
+  hangupRef.current     = hangup;
+  drainRef.current      = drainCandidates;
+
   const createPeerConnection = useCallback(() => {
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
-    // When we generate an ICE candidate, push it to the server
     pc.onicecandidate = async ({ candidate }) => {
       if (!candidate || !callIdRef.current) return;
       try {
@@ -105,75 +134,68 @@ export function useWebRTC({ onCallEnded, onRemoteStream }) {
           candidate: JSON.stringify(candidate),
           role: roleRef.current,
         });
-      } catch { /* non-fatal — candidate may retry */ }
+      } catch { /* non-fatal */ }
     };
 
-    // ICE connection state changes
     pc.oniceconnectionstatechange = () => {
       const state = pc.iceConnectionState;
-      console.log("[WebRTC] ICE state:", state);
+      console.log("[WebRTC] ICE:", state);
 
       if (state === "connected" || state === "completed") {
-        // Connected — stop all polling, start lightweight candidate drain
         clearInterval(statusPollRef.current);
         clearInterval(candidatePollRef.current);
-        // One more drain after connection for any stragglers
-        setTimeout(() => drainCandidates(), CANDIDATE_DRAIN_MS);
+        setTimeout(() => drainRef.current(), CANDIDATE_DRAIN_MS);
       }
 
       if (state === "failed") {
-        // ICE restart attempt — gives WebRTC a second chance through TURN
-        console.warn("[WebRTC] ICE failed, attempting restart");
+        console.warn("[WebRTC] ICE failed — restarting");
         pc.restartIce();
       }
 
       if (state === "disconnected") {
-        // Transient — wait a moment before treating as ended
         setTimeout(() => {
-          if (
-            pc.iceConnectionState === "disconnected" ||
-            pc.iceConnectionState === "failed"
-          ) {
-            hangup("ended");
+          if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
+            hangupRef.current("ended");
           }
         }, 4_000);
       }
     };
 
     pc.onconnectionstatechange = () => {
-      console.log("[WebRTC] Connection state:", pc.connectionState);
+      console.log("[WebRTC] Connection:", pc.connectionState);
       if (pc.connectionState === "failed") {
-        hangup("ended");
+        hangupRef.current("ended");
       }
     };
 
-    // When we receive the remote audio/video stream
+    // ── CRITICAL: this is where audio is delivered ───────────────────────────
+    // ontrack fires when the remote peer's audio track arrives.
+    // We pass the full MediaStream to the parent so it can attach it to
+    // the persistent <audio> element that lives in Chat.jsx.
     pc.ontrack = (event) => {
+      console.log("[WebRTC] ontrack fired, streams:", event.streams.length);
       const [remoteStream] = event.streams;
-      if (remoteStream && onRemoteStream) {
-        onRemoteStream(remoteStream);
+      if (remoteStream) {
+        onRemoteStreamRef.current?.(remoteStream);
       }
     };
 
     return pc;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onRemoteStream]);
+  }, []); // no deps — uses refs for everything mutable
 
-  // ── Get local media (mic or mic+camera) ─────────────────────────────────────
+  // ── Get local media ─────────────────────────────────────────────────────────
   const getLocalStream = useCallback(async (callType = "audio") => {
-    const constraints =
-      callType === "video" ? VIDEO_CONSTRAINTS : AUDIO_CONSTRAINTS;
+    const constraints = callType === "video" ? VIDEO_CONSTRAINTS : AUDIO_CONSTRAINTS;
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     localStreamRef.current = stream;
     return stream;
   }, []);
 
-  // ── Add local stream tracks to peer connection ───────────────────────────────
   const addLocalTracks = useCallback((pc, stream) => {
     stream.getTracks().forEach((track) => pc.addTrack(track, stream));
   }, []);
 
-  // ── Poll for ICE candidates from the other side ──────────────────────────────
+  // ── Poll for remote ICE candidates ──────────────────────────────────────────
   const startCandidatePolling = useCallback(() => {
     clearInterval(candidatePollRef.current);
 
@@ -195,33 +217,17 @@ export function useWebRTC({ onCallEnded, onRemoteStream }) {
       } catch { /* poll silently */ }
     };
 
-    poll(); // immediate first poll
+    poll();
     candidatePollRef.current = setInterval(poll, CANDIDATE_POLL_MS);
-  }, []);
-
-  // One-shot drain of remaining candidates (after connection established)
-  const drainCandidates = useCallback(async () => {
-    if (!callIdRef.current || !pcRef.current) return;
-    try {
-      const { data } = await api.get(
-        `${callCandidatesRoute}/${callIdRef.current}?role=${roleRef.current}`
-      );
-      for (const raw of data.candidates ?? []) {
-        if (seenCandidates.current.has(raw)) continue;
-        seenCandidates.current.add(raw);
-        try {
-          await pcRef.current.addIceCandidate(new RTCIceCandidate(JSON.parse(raw)));
-        } catch { /* stale candidate, ignore */ }
-      }
-    } catch { /* ignore */ }
   }, []);
 
   // ── CALLER: initiate a call ──────────────────────────────────────────────────
   const startCall = useCallback(
     async ({ calleeId, callType = "audio" }) => {
       callTypeRef.current = callType;
-      roleRef.current = "caller";
+      roleRef.current     = "caller";
       seenCandidates.current = new Set();
+      hangingUpRef.current   = false;
 
       const pc = createPeerConnection();
       pcRef.current = pc;
@@ -229,11 +235,10 @@ export function useWebRTC({ onCallEnded, onRemoteStream }) {
       const stream = await getLocalStream(callType);
       addLocalTracks(pc, stream);
 
-      // Create SDP offer with audio-specific optimisations
       const offer = await pc.createOffer({
         offerToReceiveAudio: true,
         offerToReceiveVideo: callType === "video",
-        voiceActivityDetection: true, // saves bandwidth during silence
+        voiceActivityDetection: true,
       });
       await pc.setLocalDescription(offer);
 
@@ -245,43 +250,39 @@ export function useWebRTC({ onCallEnded, onRemoteStream }) {
 
       callIdRef.current = data.callId;
 
-      // Poll for the answer
+      // Poll for answer
       clearInterval(statusPollRef.current);
       statusPollRef.current = setInterval(async () => {
         try {
-          const { data: statusData } = await api.get(
-            `${callStatusRoute}/${callIdRef.current}`
-          );
+          const { data: s } = await api.get(`${callStatusRoute}/${callIdRef.current}`);
 
-          if (statusData.status === "active" && statusData.answer) {
+          if (s.status === "active" && s.answer) {
             clearInterval(statusPollRef.current);
-            const answer = JSON.parse(statusData.answer);
-            await pc.setRemoteDescription(new RTCSessionDescription(answer));
+            await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(s.answer)));
             startCandidatePolling();
           }
 
-          if (["ended", "rejected", "missed"].includes(statusData.status)) {
+          if (["ended", "rejected", "missed"].includes(s.status)) {
             clearInterval(statusPollRef.current);
-            await cleanup();
-            onCallEnded?.(statusData.status);
+            cleanup();
+            onCallEndedRef.current?.(s.status);
           }
         } catch { /* poll silently */ }
       }, STATUS_POLL_MS);
 
-      // Start collecting our own ICE candidates immediately
-      // (they'll be pushed to server via onicecandidate)
       return data.callId;
     },
-    [createPeerConnection, getLocalStream, addLocalTracks, startCandidatePolling, onCallEnded, cleanup]
+    [createPeerConnection, getLocalStream, addLocalTracks, startCandidatePolling, cleanup]
   );
 
   // ── CALLEE: accept an incoming call ─────────────────────────────────────────
   const acceptCall = useCallback(
     async ({ callId, offer, callType = "audio" }) => {
-      callIdRef.current = callId;
-      callTypeRef.current = callType;
-      roleRef.current = "callee";
+      callIdRef.current      = callId;
+      callTypeRef.current    = callType;
+      roleRef.current        = "callee";
       seenCandidates.current = new Set();
+      hangingUpRef.current   = false;
 
       const pc = createPeerConnection();
       pcRef.current = pc;
@@ -294,12 +295,8 @@ export function useWebRTC({ onCallEnded, onRemoteStream }) {
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
-      await api.post(callAnswerRoute, {
-        callId,
-        answer: JSON.stringify(answer),
-      });
+      await api.post(callAnswerRoute, { callId, answer: JSON.stringify(answer) });
 
-      // Start polling for caller's ICE candidates
       startCandidatePolling();
     },
     [createPeerConnection, getLocalStream, addLocalTracks, startCandidatePolling]
@@ -307,49 +304,19 @@ export function useWebRTC({ onCallEnded, onRemoteStream }) {
 
   // ── Reject without answering ─────────────────────────────────────────────────
   const rejectCall = useCallback(async (callId) => {
-    try {
-      await api.post(callEndRoute, { callId, reason: "rejected" });
-    } catch { /* ignore */ }
-    await cleanup();
-    onCallEnded?.("rejected");
-  }, [onCallEnded, cleanup]);
+    try { await api.post(callEndRoute, { callId, reason: "rejected" }); } catch { /* ignore */ }
+    cleanup();
+    onCallEndedRef.current?.("rejected");
+  }, [cleanup]);
 
-  // ── Mute / unmute local audio ────────────────────────────────────────────────
+  // ── Mute / unmute ────────────────────────────────────────────────────────────
   const setMuted = useCallback((muted) => {
-    if (!localStreamRef.current) return;
-    localStreamRef.current.getAudioTracks().forEach((t) => {
-      t.enabled = !muted;
-    });
+    localStreamRef.current?.getAudioTracks().forEach((t) => { t.enabled = !muted; });
   }, []);
 
-  // ── Toggle local video (future use) ─────────────────────────────────────────
   const setVideoEnabled = useCallback((enabled) => {
-    if (!localStreamRef.current) return;
-    localStreamRef.current.getVideoTracks().forEach((t) => {
-      t.enabled = enabled;
-    });
+    localStreamRef.current?.getVideoTracks().forEach((t) => { t.enabled = enabled; });
   }, []);
 
-  // ── Hang up from either side ─────────────────────────────────────────────────
-  const hangup = useCallback(async (reason = "ended") => {
-    const id = callIdRef.current;
-    await cleanup();
-    if (id) {
-      try {
-        await api.post(callEndRoute, { callId: id, reason });
-      } catch { /* ignore */ }
-    }
-    onCallEnded?.(reason);
-  }, [onCallEnded, cleanup]);
-
- 
-
-  return {
-    startCall,
-    acceptCall,
-    rejectCall,
-    hangup,
-    setMuted,
-    setVideoEnabled,
-  };
+  return { startCall, acceptCall, rejectCall, hangup, setMuted, setVideoEnabled };
 }

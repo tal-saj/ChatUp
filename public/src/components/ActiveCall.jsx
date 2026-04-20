@@ -1,50 +1,70 @@
 // components/ActiveCall.jsx
-// Minimal, elegant overlay shown while a call is in progress.
-// Video-ready: pass localVideoRef / remoteVideoRef for future video calls.
-
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Phone, Mic, MicOff } from "lucide-react";
 
 export default function ActiveCall({
   contact,
   callType = "audio",
-  remoteStream,
+  remoteStream,       // MediaStream passed from Chat.jsx
   onHangup,
   onMuteChange,
   darkMode,
 }) {
   const [muted,     setMuted]     = useState(false);
-  const [elapsed,   setElapsed]   = useState(0);     // seconds
-  const [callState, setCallState] = useState("connecting"); // connecting | active
-  const timerRef      = useRef(null);
-  const remoteAudio   = useRef(null);
-  const remoteVideoEl = useRef(null);
+  const [elapsed,   setElapsed]   = useState(0);
+  const [callState, setCallState] = useState("connecting");
+  const timerRef    = useRef(null);
+  const audioElRef  = useRef(null); // <audio> element ref
 
-  // Attach remote stream to audio/video element
-  useEffect(() => {
-    if (!remoteStream) return;
+  // ── Attach remote stream as soon as it arrives (or changes) ─────────────────
+  // useLayoutEffect fires synchronously after DOM mutations, before paint.
+  // This ensures the <audio> element exists before we try to assign srcObject.
+  useLayoutEffect(() => {
+    const el = audioElRef.current;
+    if (!el || !remoteStream) return;
 
-    // Audio element always
-    if (remoteAudio.current) {
-      remoteAudio.current.srcObject = remoteStream;
+    // Only reassign if the stream actually changed
+    if (el.srcObject !== remoteStream) {
+      el.srcObject = remoteStream;
     }
-    // Video element (future use)
-    if (remoteVideoEl.current && callType === "video") {
-      remoteVideoEl.current.srcObject = remoteStream;
+
+    // Autoplay is blocked by browsers unless triggered by user gesture.
+    // The user already tapped "Accept" so this .play() is allowed.
+    const playPromise = el.play();
+    if (playPromise !== undefined) {
+      playPromise.catch((err) => {
+        // NotAllowedError: user hasn't interacted enough yet.
+        // Retry on next user interaction.
+        console.warn("[Audio] play() blocked:", err.message);
+        const retry = () => { el.play().catch(() => {}); };
+        document.addEventListener("click",     retry, { once: true });
+        document.addEventListener("touchstart", retry, { once: true });
+      });
     }
 
     setCallState("active");
-  }, [remoteStream, callType]);
+  }, [remoteStream]);
 
-  // Call timer
+  // ── Call timer ───────────────────────────────────────────────────────────────
   useEffect(() => {
     if (callState !== "active") return;
     timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1_000);
     return () => clearInterval(timerRef.current);
   }, [callState]);
 
+  // ── Cleanup on unmount ───────────────────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      clearInterval(timerRef.current);
+      // Detach stream from audio element on unmount to release resources
+      if (audioElRef.current) {
+        audioElRef.current.srcObject = null;
+      }
+    };
+  }, []);
+
   const formatTime = (s) => {
-    const m = Math.floor(s / 60).toString().padStart(2, "0");
+    const m   = Math.floor(s / 60).toString().padStart(2, "0");
     const sec = (s % 60).toString().padStart(2, "0");
     return `${m}:${sec}`;
   };
@@ -55,24 +75,27 @@ export default function ActiveCall({
     onMuteChange?.(next);
   };
 
-  const dm = darkMode;
-
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center">
-      {/* Hidden audio element — plays remote audio */}
-      <audio ref={remoteAudio} autoPlay playsInline />
+
+      {/* ── Audio element — always rendered, never hidden ───────────────────── */}
+      {/* playsInline is critical on iOS to prevent full-screen audio takeover  */}
+      <audio
+        ref={audioElRef}
+        autoPlay
+        playsInline
+        style={{ position: "absolute", width: 0, height: 0, opacity: 0, pointerEvents: "none" }}
+      />
 
       {/* Backdrop */}
       <div
         className="absolute inset-0 backdrop-blur-2xl"
         style={{
-          background: dm
-            ? "radial-gradient(ellipse at center, rgba(30,41,59,0.95) 0%, rgba(15,23,42,0.98) 100%)"
-            : "radial-gradient(ellipse at center, rgba(30,41,59,0.88) 0%, rgba(15,23,42,0.92) 100%)",
+          background: "radial-gradient(ellipse at center, rgba(30,41,59,0.96) 0%, rgba(15,23,42,0.99) 100%)",
         }}
       />
 
-      {/* Animated sound-wave rings (pure CSS, audio call vibe) */}
+      {/* Animated rings — only when active */}
       {callState === "active" && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           {[1, 2, 3].map((i) => (
@@ -116,29 +139,22 @@ export default function ActiveCall({
           </div>
         </div>
 
-        {/* Name + status */}
+        {/* Name + timer */}
         <div className="text-center">
           <h2 className="text-2xl font-bold text-white tracking-tight">
             {contact?.username}
           </h2>
-          <p className={`text-sm mt-1 font-medium ${
+          <p className={`text-sm mt-1.5 font-medium tabular-nums ${
             callState === "active" ? "text-emerald-400" : "text-slate-400"
           }`}>
-            {callState === "active"
-              ? formatTime(elapsed)
-              : "Connecting..."}
+            {callState === "active" ? formatTime(elapsed) : "Connecting…"}
           </p>
         </div>
 
         {/* Controls */}
         <div className="flex items-center gap-5 mt-2">
-          {/* Mute */}
-          <button
-            onClick={toggleMute}
-            className={`
-              flex flex-col items-center gap-2 group
-            `}
-          >
+          {/* Mute toggle */}
+          <button onClick={toggleMute} className="flex flex-col items-center gap-2">
             <span className={`
               flex h-14 w-14 items-center justify-center rounded-full
               transition-all duration-200 hover:scale-110 active:scale-95
@@ -155,15 +171,11 @@ export default function ActiveCall({
           </button>
 
           {/* End call */}
-          <button
-            onClick={onHangup}
-            className="flex flex-col items-center gap-2 group"
-          >
+          <button onClick={onHangup} className="flex flex-col items-center gap-2">
             <span className="
-              flex h-16 w-16 items-center justify-center rounded-full
+              flex h-16 w-16 items-center justify-center rounded-full rotate-[135deg]
               bg-red-500 text-white shadow-2xl shadow-red-500/50
               transition-all duration-200 hover:bg-red-400 hover:scale-110 active:scale-95
-              rotate-[135deg]
             ">
               <Phone size={24} />
             </span>
