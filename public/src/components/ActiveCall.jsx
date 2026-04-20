@@ -53,15 +53,19 @@ export default function ActiveCall({
   }, [callState]);
 
   // ── Cleanup on unmount ───────────────────────────────────────────────────────
-  useEffect(() => {
-    return () => {
-      clearInterval(timerRef.current);
-      // Detach stream from audio element on unmount to release resources
-      if (audioElRef.current) {
-        audioElRef.current.srcObject = null;
-      }
-    };
-  }, []);
+useEffect(() => {
+  // Capture the current value of the ref
+  const currentAudioEl = audioElRef.current;
+
+  return () => {
+    clearInterval(timerRef.current);
+    
+    // Use the captured variable instead of the ref property
+    if (currentAudioEl) {
+      currentAudioEl.srcObject = null;
+    }
+  };
+}, []);
 
   const formatTime = (s) => {
     const m   = Math.floor(s / 60).toString().padStart(2, "0");
