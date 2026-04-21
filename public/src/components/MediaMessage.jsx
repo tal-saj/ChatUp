@@ -4,7 +4,7 @@
 // Decryption happens lazily on first render using the AES key from the message.
 
 import React, { useEffect, useRef, useState } from "react";
-import { FileText, Download, Play, Pause, Loader2, AlertCircle } from "lucide-react";
+import { /*FileText,*/ Download, Play, Pause, Loader2, AlertCircle } from "lucide-react";
 import { fetchAndDecrypt } from "../utils/cryptoMedia";
 
 // ── Format helpers ────────────────────────────────────────────────────────────
@@ -24,13 +24,13 @@ function formatDuration(s) {
 // ── Image bubble ──────────────────────────────────────────────────────────────
 function ImageBubble({ objectUrl, isSent, darkMode }) {
   const [open, setOpen] = useState(false);
-  const dm = darkMode;
+  // const dm = darkMode;
 
   return (
     <>
       <img
         src={objectUrl}
-        alt="Image"
+        alt="Media Image"
         className="max-w-[240px] max-h-[300px] rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
         onClick={() => setOpen(true)}
       />
@@ -233,7 +233,7 @@ export default function MediaMessage({ msg, isSent, darkMode }) {
   }, [msg.media.url, msg.media.wrappedKey, msg.media.mimeType]);
 
   const dm = darkMode;
-  const { mimeType, fileName, fileSize } = msg.media;
+  const { /*mimeType,*/ fileName, fileSize } = msg.media;
 
   if (status === "loading") {
     return (

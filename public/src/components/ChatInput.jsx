@@ -5,10 +5,10 @@
 //   • All uploads are AES-GCM encrypted client-side before sending to server
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import EmojiPicker from "emoji-picker-react";
-import { Smile, Send, Paperclip, Mic, MicOff, X, FileText, Image, Film } from "lucide-react";
-import { encryptFile } from "../utils/cryptoMedia";
-import { uploadMediaRoute, sendMediaMessageRoute } from "../utils/APIRoutes";
-import api from "../utils/axiosConfig";
+import { Smile, Send, Paperclip, Mic, MicOff, X, FileText, /*Image,*/ Film } from "lucide-react";
+/*import { encryptFile } from "../utils/cryptoMedia";*/
+import { uploadMediaRoute /*, sendMediaMessageRoute*/ } from "../utils/APIRoutes";
+/*import api from "../utils/axiosConfig";*/
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function formatBytes(bytes) {
@@ -17,12 +17,12 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function getMessageType(mimeType) {
-  if (mimeType.startsWith("image/")) return "image";
-  if (mimeType.startsWith("video/")) return "video";
-  if (mimeType.startsWith("audio/")) return "audio";
-  return "document";
-}
+// function getMessageType(mimeType) {
+//   if (mimeType.startsWith("image/")) return "image";
+//   if (mimeType.startsWith("video/")) return "video";
+//   if (mimeType.startsWith("audio/")) return "audio";
+//   return "document";
+// }
 
 // ── MediaPreview (shown before send) ─────────────────────────────────────────
 function MediaPreview({ file, onRemove, darkMode }) {
