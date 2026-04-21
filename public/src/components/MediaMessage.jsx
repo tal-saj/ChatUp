@@ -30,7 +30,7 @@ function ImageBubble({ objectUrl, isSent, darkMode }) {
     <>
       <img
         src={objectUrl}
-        alt="Media Image"
+        alt="the image whaic was sent by user"
         className="max-w-[240px] max-h-[300px] rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
         onClick={() => setOpen(true)}
       />

@@ -7,7 +7,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import EmojiPicker from "emoji-picker-react";
 import { Smile, Send, Paperclip, Mic, MicOff, X, FileText, /*Image,*/ Film } from "lucide-react";
 /*import { encryptFile } from "../utils/cryptoMedia";*/
-import { uploadMediaRoute /*, sendMediaMessageRoute*/ } from "../utils/APIRoutes";
+// import { uploadMediaRoute /*, sendMediaMessageRoute*/ } from "../utils/APIRoutes";
 /*import api from "../utils/axiosConfig";*/
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
