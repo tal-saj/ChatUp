@@ -28,12 +28,12 @@ function ImageBubble({ objectUrl, isSent, darkMode }) {
 
   return (
     <>
-      <img
-        src={objectUrl}
-        alt="the image whaic was sent by user"
-        className="max-w-[240px] max-h-[300px] rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
-        onClick={() => setOpen(true)}
-      />
+    <img
+  src={objectUrl}
+  alt="Content sent by user"
+  className="max-w-[240px] max-h-[300px] rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
+  onClick={() => setOpen(true)}
+/>
       {/* Full-screen lightbox */}
       {open && (
         <div
