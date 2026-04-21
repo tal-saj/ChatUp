@@ -10,8 +10,13 @@ export const heartbeatRoute      = `/api/auth/heartbeat`;
 
 // Messages
 export const sendMessageRoute    = `/api/messages/addmsg`;
+export const sendMediaMessageRoute = `/api/messages/addmedia`;
 export const recieveMessageRoute = `/api/messages/getmsg`;
 export const unreadCountsRoute   = `/api/messages/unread`;
+
+// Media upload
+export const uploadMediaRoute    = `/api/media/upload`;
+export const deleteMediaRoute    = `/api/media`;
 
 // Friends
 export const searchUsersRoute         = `/api/friends/search`;
@@ -26,6 +31,6 @@ export const callOfferRoute      = `/api/calls/offer`;
 export const callAnswerRoute     = `/api/calls/answer`;
 export const callCandidateRoute  = `/api/calls/candidate`;
 export const callIncomingRoute   = `/api/calls/incoming`;
-export const callStatusRoute     = `/api/calls/status`;   // + /:callId
-export const callCandidatesRoute = `/api/calls/candidates`; // + /:callId
+export const callStatusRoute     = `/api/calls/status`;
+export const callCandidatesRoute = `/api/calls/candidates`;
 export const callEndRoute        = `/api/calls/end`;

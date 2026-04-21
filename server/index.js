@@ -2,13 +2,27 @@
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
+const cloudinary = require("cloudinary").v2;
 const connectDB = require("./lib/connectDB");
-const authRoutes = require("./routes/routes_auth");   // ← kept original filename
+const authRoutes = require("./routes/routes_auth");
 const messageRoutes = require("./routes/messages");
 const friendsRoutes = require("./routes/friends");
 const callRoutes = require("./routes/calls");
+const mediaRoutes = require("./routes/media");
 
 require("dotenv").config();
+
+// ── Cloudinary configuration ─────────────────────────────────────────────────
+// Set these in Vercel environment variables:
+//   CLOUDINARY_CLOUD_NAME   your cloud name
+//   CLOUDINARY_API_KEY      your api key
+//   CLOUDINARY_API_SECRET   your api secret
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure:     true,
+});
 
 const app = express();
 
@@ -26,7 +40,6 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// Short-circuit ALL OPTIONS preflights before DB middleware
 app.options("*", (req, res) => {
   res.header("Access-Control-Allow-Origin", req.headers.origin);
   res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
@@ -49,7 +62,7 @@ app.use(async (req, res, next) => {
   }
 });
 
-// ── Debug routes ──────────────────────────────────────────────────────────────
+// ── Routes ────────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   res.json({
     message: "Chat App API",
@@ -68,17 +81,16 @@ app.get("/debug", (req, res) => {
   });
 });
 
-// ── Routes ────────────────────────────────────────────────────────────────────
-app.use("/api/auth", authRoutes);
+app.use("/api/auth",     authRoutes);
 app.use("/api/messages", messageRoutes);
-app.use("/api/friends", friendsRoutes);
-app.use("/api/calls", callRoutes);
+app.use("/api/friends",  friendsRoutes);
+app.use("/api/calls",    callRoutes);
+app.use("/api/media",    mediaRoutes);
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
   res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
   res.header("Access-Control-Allow-Credentials", "true");
-
   console.error("SERVER ERROR:", {
     message: err.message,
     stack: err.stack?.substring(0, 500),

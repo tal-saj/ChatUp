@@ -2,9 +2,16 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import ChatInput from "./ChatInput";
 import CallButton from "./CallButton";
+import MediaMessage from "./MediaMessage";
 import { Lock } from "lucide-react";
-import { sendMessageRoute, recieveMessageRoute } from "../utils/APIRoutes";
+import {
+  sendMessageRoute,
+  sendMediaMessageRoute,
+  recieveMessageRoute,
+  uploadMediaRoute,
+} from "../utils/APIRoutes";
 import { encryptMessage, decryptMessage } from "../utils/crypto";
+import { encryptFile } from "../utils/cryptoMedia";
 import api from "../utils/axiosConfig";
 
 export default function ChatContainer({
@@ -26,14 +33,20 @@ export default function ChatContainer({
   })();
   const currentUserId = currentUser?._id ?? null;
 
+  // ── Decrypt text messages ─────────────────────────────────────────────────
   const decryptAll = async (rawMessages) =>
     Promise.all(
       rawMessages.map(async (msg) => {
+        if (msg.messageType !== "text" && msg.messageType) {
+          // Media message — no text to decrypt, pass through as-is
+          return msg;
+        }
         const plaintext = await decryptMessage(msg.encryptedMessage);
         return { ...msg, message: plaintext ?? "🔒 Unable to decrypt" };
       })
     );
 
+  // ── Fetch all messages ─────────────────────────────────────────────────────
   useEffect(() => {
     const fetchMessages = async () => {
       if (!currentUserId || !currentChat?._id) {
@@ -60,6 +73,7 @@ export default function ChatContainer({
     return () => clearInterval(pollTimer.current);
   }, [currentChat?._id, currentUserId]);
 
+  // ── Poll for new messages ──────────────────────────────────────────────────
   const pollNewMessages = useCallback(async () => {
     if (!currentUserId || !currentChat?._id || !lastFetchedAt) return;
     try {
@@ -82,12 +96,14 @@ export default function ChatContainer({
     return () => clearInterval(pollTimer.current);
   }, [pollNewMessages, lastFetchedAt]);
 
+  // Auto-scroll
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
 
+  // ── Send text message ──────────────────────────────────────────────────────
   const handleSendMsg = async (msg) => {
     if (!msg?.trim() || !currentUserId || !currentChat?._id) return;
     const recipientPublicKey = currentChat.publicKey;
@@ -96,7 +112,7 @@ export default function ChatContainer({
       alert("Encryption keys not available. Please refresh and try again.");
       return;
     }
-    const optimistic = { _id: `opt-${Date.now()}`, fromSelf: true, message: msg, optimistic: true };
+    const optimistic = { _id: `opt-${Date.now()}`, fromSelf: true, message: msg, messageType: "text", optimistic: true };
     setMessages((prev) => [...prev, optimistic]);
     try {
       const [encryptedForSender, encryptedForRecipient] = await Promise.all([
@@ -117,13 +133,91 @@ export default function ChatContainer({
     }
   };
 
+  // ── Send media message ─────────────────────────────────────────────────────
+  const handleSendMedia = useCallback(async (file) => {
+    if (!file || !currentUserId || !currentChat?._id) return;
+
+    const recipientPublicKey = currentChat.publicKey;
+    const senderPublicKeyJwk = localStorage.getItem("chatup-public-key-jwk");
+    if (!recipientPublicKey || !senderPublicKeyJwk) {
+      alert("Encryption keys not available. Please refresh and try again.");
+      return;
+    }
+
+    // Determine message type
+    const mimeType = file.type || "application/octet-stream";
+    let messageType = "document";
+    if (mimeType.startsWith("image/")) messageType = "image";
+    else if (mimeType.startsWith("video/")) messageType = "video";
+    else if (mimeType.startsWith("audio/")) messageType = "audio";
+
+    // Optimistic placeholder
+    const optimisticId = `opt-media-${Date.now()}`;
+    const optimistic = {
+      _id: optimisticId,
+      fromSelf: true,
+      messageType,
+      optimistic: true,
+      media: {
+        url: URL.createObjectURL(file),
+        mimeType,
+        fileName: file.name,
+        fileSize: file.size,
+        wrappedKey: null, // not available yet (optimistic)
+        _objectUrl: true, // flag: already an object URL, no need to decrypt
+      },
+    };
+    setMessages((prev) => [...prev, optimistic]);
+
+    try {
+      // 1. Encrypt the file client-side
+      const { encryptedBlob, wrappedKeyForSender, wrappedKeyForRecipient } =
+        await encryptFile(file, senderPublicKeyJwk, recipientPublicKey);
+
+      // 2. Upload encrypted blob to Cloudinary via backend
+      const formData = new FormData();
+      formData.append("file", encryptedBlob, file.name);
+      formData.append("mimeType", mimeType);
+      formData.append("fileName", file.name);
+      formData.append("fileSize", String(file.size));
+      formData.append("wrappedKeyForSender", wrappedKeyForSender);
+      formData.append("wrappedKeyForRecipient", wrappedKeyForRecipient);
+
+      const { data: uploadData } = await api.post(uploadMediaRoute, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      // 3. Save media message to DB
+      await api.post(sendMediaMessageRoute, {
+        to: currentChat._id,
+        url: uploadData.url,
+        publicId: uploadData.publicId,
+        mimeType: uploadData.mimeType,
+        fileName: uploadData.fileName,
+        fileSize: uploadData.fileSize,
+        wrappedKeyForSender: uploadData.wrappedKeyForSender,
+        wrappedKeyForRecipient: uploadData.wrappedKeyForRecipient,
+        messageType,
+      });
+
+      // Remove optimistic; next poll will fetch the real message
+      setMessages((prev) => prev.filter((m) => m._id !== optimisticId));
+      setLastFetchedAt(new Date().toISOString());
+    } catch (err) {
+      console.error("Media send failed", err);
+      setMessages((prev) => prev.filter((m) => m._id !== optimisticId));
+      alert("Failed to send media. Please try again.");
+      throw err;
+    }
+  }, [currentChat, currentUserId]);
+
   const dm = darkMode;
 
   return (
     <div className={`relative flex h-full flex-col transition-colors duration-300 ${
       dm
-        ? "bg-[#0f172a]"                          // deep navy — clearly different from slate-900 sidebar
-        : "bg-gradient-to-br from-blue-50/60 via-slate-50 to-indigo-50/40" // soft cool tint vs white sidebar
+        ? "bg-[#0f172a]"
+        : "bg-gradient-to-br from-blue-50/60 via-slate-50 to-indigo-50/40"
     }`}>
 
       {/* Header */}
@@ -164,7 +258,6 @@ export default function ChatContainer({
           </div>
         </div>
 
-        {/* Right: call button + E2E badge */}
         <div className="flex items-center gap-2">
           <CallButton
             contact={currentChat}
@@ -190,7 +283,7 @@ export default function ChatContainer({
             : "bg-white/70 text-slate-400 border border-slate-200/70"
         }`}>
           <Lock size={10} />
-          <span>Messages are end-to-end encrypted. Only you and {currentChat?.username} can read them.</span>
+          <span>Messages and media are end-to-end encrypted. Only you and {currentChat?.username} can read them.</span>
         </div>
       )}
 
@@ -202,7 +295,7 @@ export default function ChatContainer({
               <div className={`h-8 w-8 rounded-full border-2 border-t-transparent animate-spin ${
                 dm ? "border-slate-500" : "border-slate-400"
               }`} />
-              <p className={dm ? "text-slate-500" : "text-slate-400"}>Decrypting messages...</p>
+              <p className={dm ? "text-slate-500" : "text-slate-400"}>Decrypting messages…</p>
             </div>
           </div>
         ) : messages.length === 0 ? (
@@ -214,6 +307,8 @@ export default function ChatContainer({
           messages.map((msg, index) => {
             const isLast = index === messages.length - 1;
             const isSent = msg.fromSelf;
+            const isMedia = msg.messageType && msg.messageType !== "text";
+
             return (
               <div
                 key={msg._id || index}
@@ -222,24 +317,57 @@ export default function ChatContainer({
                 style={{ animation: "fadeSlideIn 0.2s ease-out forwards" }}
               >
                 <div className={`
-                  max-w-[78%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed shadow-sm
-                  ${isSent
-                    ? dm
-                      ? "bg-indigo-600 text-white rounded-br-sm shadow-indigo-900/30"
-                      : "bg-gradient-to-br from-slate-700 to-slate-900 text-white rounded-br-sm"
-                    : dm
-                      ? "bg-slate-700/70 text-slate-100 rounded-bl-sm border border-slate-600/40"
-                      : "bg-white/90 backdrop-blur-sm border border-slate-200/80 text-slate-800 rounded-bl-sm shadow-slate-200/60"
+                  ${isMedia ? "max-w-[85%]" : "max-w-[78%]"}
+                  rounded-2xl shadow-sm overflow-hidden
+                  ${isMedia
+                    // Minimal padding for media, just enough for the rounded border
+                    ? `p-1.5 ${isSent
+                        ? dm
+                          ? "bg-indigo-600 rounded-br-sm shadow-indigo-900/30"
+                          : "bg-gradient-to-br from-slate-700 to-slate-900 rounded-br-sm"
+                        : dm
+                          ? "bg-slate-700/70 rounded-bl-sm border border-slate-600/40"
+                          : "bg-white/90 backdrop-blur-sm border border-slate-200/80 rounded-bl-sm shadow-slate-200/60"
+                      }`
+                    : `px-4 py-2.5 text-sm leading-relaxed ${isSent
+                        ? dm
+                          ? "bg-indigo-600 text-white rounded-br-sm shadow-indigo-900/30"
+                          : "bg-gradient-to-br from-slate-700 to-slate-900 text-white rounded-br-sm"
+                        : dm
+                          ? "bg-slate-700/70 text-slate-100 rounded-bl-sm border border-slate-600/40"
+                          : "bg-white/90 backdrop-blur-sm border border-slate-200/80 text-slate-800 rounded-bl-sm shadow-slate-200/60"
+                      }`
                   }
                   ${msg.optimistic ? "opacity-70" : ""}
                 `}>
-                  <p className="break-words">{msg.message}</p>
-                  {msg.createdAt && (
-                    <p className={`text-[10px] mt-1 text-right ${
-                      isSent ? "text-white/50" : dm ? "text-slate-500" : "text-slate-400"
-                    }`}>
-                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </p>
+                  {isMedia ? (
+                    <>
+                      {/* Optimistic: show local preview without decryption */}
+                      {msg.optimistic && msg.media?._objectUrl ? (
+                        <OptimisticMediaPreview msg={msg} isSent={isSent} darkMode={dm} />
+                      ) : (
+                        <MediaMessage msg={msg} isSent={isSent} darkMode={dm} />
+                      )}
+                      {/* Timestamp below media */}
+                      {msg.createdAt && (
+                        <p className={`text-[10px] mt-1 px-1 text-right ${
+                          isSent ? "text-white/50" : dm ? "text-slate-500" : "text-slate-400"
+                        }`}>
+                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className="break-words">{msg.message}</p>
+                      {msg.createdAt && (
+                        <p className={`text-[10px] mt-1 text-right ${
+                          isSent ? "text-white/50" : dm ? "text-slate-500" : "text-slate-400"
+                        }`}>
+                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -254,7 +382,11 @@ export default function ChatContainer({
           ? "border-slate-700/60 bg-slate-800/60"
           : "border-slate-200/60 bg-white/60 backdrop-blur-sm"
       }`}>
-        <ChatInput handleSendMsg={handleSendMsg} darkMode={dm} />
+        <ChatInput
+          handleSendMsg={handleSendMsg}
+          handleSendMedia={handleSendMedia}
+          darkMode={dm}
+        />
       </div>
 
       <style>{`
@@ -263,6 +395,43 @@ export default function ChatContainer({
           to   { opacity: 1; transform: translateY(0); }
         }
       `}</style>
+    </div>
+  );
+}
+
+// ── Optimistic preview (before upload completes) ──────────────────────────────
+function OptimisticMediaPreview({ msg, isSent, darkMode }) {
+  const { mimeType, url, fileName } = msg.media;
+  const dm = darkMode;
+
+  if (mimeType?.startsWith("image/")) {
+    return (
+      <img
+        src={url}
+        alt="Sending…"
+        className="max-w-[240px] max-h-[300px] rounded-xl object-cover opacity-60"
+      />
+    );
+  }
+  if (mimeType?.startsWith("video/")) {
+    return (
+      <video
+        src={url}
+        className="max-w-[280px] rounded-xl opacity-60"
+        style={{ maxHeight: 300 }}
+      />
+    );
+  }
+  return (
+    <div className={`flex items-center gap-2 py-1 px-1 opacity-60`}>
+      <div className={`h-8 w-8 rounded-lg flex items-center justify-center text-[9px] font-bold ${
+        isSent ? "bg-white/20 text-white" : dm ? "bg-slate-600 text-slate-300" : "bg-slate-200 text-slate-600"
+      }`}>
+        {fileName?.split(".").pop()?.toUpperCase().slice(0, 4) || "FILE"}
+      </div>
+      <span className={`text-xs ${isSent ? "text-white/70" : dm ? "text-slate-400" : "text-slate-500"}`}>
+        Uploading…
+      </span>
     </div>
   );
 }
